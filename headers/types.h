@@ -178,6 +178,8 @@ typedef struct s_data
 	atomic_int		threads_done;
 	double			refresh_interval;
 	float			*accum_buffer;
+	float			*variance_buffer;
+	int			*pixel_sample_counts;
 	int			sample_count;
 } t_appdata;
 /* ************************************************************************** */

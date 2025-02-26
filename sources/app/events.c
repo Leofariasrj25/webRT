@@ -29,7 +29,7 @@ void key_hook(mlx_key_data_t keydata, void* param) {
     double elapsed = (now.tv_sec - last_render.tv_sec) + 
                      (now.tv_nsec - last_render.tv_nsec) / 1e9;
 
-    if (elapsed < 0.1) return; // 100ms cooldown
+    if (elapsed < 0.1) return;
 
     t_appdata* app_data = (t_appdata*)param;
     t_camera *camera = app_data->scene_info->camera;
@@ -48,13 +48,16 @@ void key_hook(mlx_key_data_t keydata, void* param) {
 
     pthread_mutex_lock(&app_data->render_mutex);
     if (moved) {
-        app_data->rendering_in_progress = true;
-        app_data->sample_count = 0; // Reset on movement
+        app_data->sample_count = 0;
         memset(app_data->accum_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * 4 * sizeof(float));
+        memset(app_data->variance_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(float));
+        memset(app_data->pixel_sample_counts, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint32_t));
+        app_data->image_displayed = false;
+        app_data->rendering_in_progress = true; // Keep true for progressive rendering
         pthread_mutex_unlock(&app_data->render_mutex);
         trigger_render(app_data);
-        pthread_mutex_lock(&app_data->render_mutex);
-        app_data->rendering_in_progress = false;
+        last_render = now;
+    } else {
+        pthread_mutex_unlock(&app_data->render_mutex);
     }
-    pthread_mutex_unlock(&app_data->render_mutex);
 }
