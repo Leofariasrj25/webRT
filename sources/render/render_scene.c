@@ -18,9 +18,23 @@
 #define JITTER_FACTOR 2.0f
 #define PIXEL_SIZE 4
 
-static void	render_px(int x, int y, t_appdata *app_data, mlx_image_t *image);
-static t_ray	get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene);
+typedef struct {
+    uint32_t state;
+} Xorshift32;
+
+static inline uint32_t xorshift32(Xorshift32 *rng) {
+    uint32_t x = rng->state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rng->state = x;
+    return x;
+}
+
+static void	render_px(int x, int y, t_appdata *app_data, mlx_image_t *image, Xorshift32 *rng);
+static t_ray    get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene, Xorshift32 *rng);
 void		denoise_image(t_appdata *app_data);
+
 
 void trigger_render(void *arg) {
     t_appdata *app_data = (t_appdata *)arg;
@@ -162,6 +176,7 @@ void display_initial_frame(t_appdata *app_data) {
 void* render_area(void* arg) {
     t_threaddata *thread_data = (t_threaddata *)arg;
     t_appdata *app_data = thread_data->app_data;
+    Xorshift32 rng = { .state = thread_data->thread_id + 1 }; // Seed with thread ID
 
     while (1) {
         pthread_mutex_lock(&app_data->render_mutex);
@@ -177,11 +192,11 @@ void* render_area(void* arg) {
         if (pixels_to_sample < 1) pixels_to_sample = 1;
 
         for (int i = 0; i < pixels_to_sample; i++) {
-            int x = rand() % SCREEN_WIDTH;
-            int y = thread_data->start_y + (rand() % (thread_data->end_y - thread_data->start_y));
+            int x = xorshift32(&rng) % SCREEN_WIDTH;
+            int y = thread_data->start_y + (xorshift32(&rng) % (thread_data->end_y - thread_data->start_y));
             int idx = (y * SCREEN_WIDTH + x);
             if (app_data->pixel_sample_counts[idx] < 8) { // Simplified condition
-                render_px(x, y, app_data, app_data->render_image);
+                render_px(x, y, app_data, app_data->render_image, &rng);
             }
         }
 
@@ -197,7 +212,8 @@ void* render_area(void* arg) {
     return NULL;
 }
 
-static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image) {
+static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image, Xorshift32 *rng) {
+
     int idx = (y * SCREEN_WIDTH + x);
     int accum_idx = idx * 4;
 
@@ -206,7 +222,7 @@ static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image) {
     }
 
     t_scene *s = app_data->scene_info;
-    t_ray ray = get_px_ray(x, y, image, s);
+    t_ray ray = get_px_ray(x, y, image, s, rng);
     t_intersection intersec = get_intersection(ray, s->elements);
     int color = get_px_color(intersec, ray, s);
 
@@ -252,15 +268,9 @@ static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image) {
     } else {
         app_data->variance_buffer[idx] = 1.0f;
     }
-
-    /*if (app_data->pixel_sample_counts[idx] <= 5 || app_data->pixel_sample_counts[idx] == 8) {
-        printf("render_px (%d,%d): samples=%d, variance=%.4f, accum_r=%.2f\n", 
-               x, y, app_data->pixel_sample_counts[idx], app_data->variance_buffer[idx], 
-               app_data->accum_buffer[accum_idx]);
-    }*/
 }
 
-static t_ray	get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene)
+static t_ray    get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene, Xorshift32 *rng)
 {
 	static double	a_ratio;
 	static double	fov_mult;
@@ -279,8 +289,8 @@ static t_ray	get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene)
 	
 	// Jitter: optimized single rand() call per axis
         //float pixel_width = 1.0f / image->width; // Scale jitter to pixel size
-	jitter_x = (((float)rand() / RAND_MAX) - 0.5f) * JITTER_FACTOR;
-	jitter_y = (((float)rand() / RAND_MAX) - 0.5f) * JITTER_FACTOR;
+	jitter_x = (((float)xorshift32(rng) / UINT32_MAX) - 0.5f) * JITTER_FACTOR;
+	jitter_y = (((float)xorshift32(rng) / UINT32_MAX) - 0.5f) * JITTER_FACTOR;
 
 	// Apply jitter to pixel coordinates
 	jx = (double)x + jitter_x;
