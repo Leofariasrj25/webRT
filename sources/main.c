@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "../headers/mini_rt.h"
+#include <time.h>
 
 static int	init_scene(t_appdata *scene, char *filepath);
 static int	init_engine(t_appdata *app_data);
@@ -132,5 +133,6 @@ static int	init_engine(t_appdata *app_data)
 	app_data->pixel_sample_counts = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(uint32_t));
 	app_data->sample_count = 0;
 	app_data->image_displayed = false;
+	srand(time(0));
 	return (0);
 }
