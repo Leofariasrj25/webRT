@@ -18,7 +18,7 @@ int	scene_open(char *filename)
 {
 	int	scene_fd;
 
-	log_msg("opening the .rt file");
+	log_msg("opening the .rt file", INFO);
 	scene_fd = open(filename, O_WRONLY);
 	if (scene_fd < 0 && errno == EISDIR)
 	{

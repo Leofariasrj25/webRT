@@ -137,4 +137,35 @@ retest: cleantest test
 run1: $(NAME)
 	./$(NAME) ./scenes/scene.rt
 
-.PHONY: all clean fclean re test cleantest retest run1
+LIBFT_WEB = $(LIBFT_DIR)/libft_web.a
+LDFLAGS += -s ASYNCIFY -s FETCH=1 -s ASYNCIFY_IMPORTS=['emscripten_set_main_loop_arg']
+
+libft_web:
+	@echo "Building libft for WebAssembly"
+	@cd $(LIBFT_DIR) && make CC="emcc" CFLAGS="$(CFLAGS)" clean
+	@cd $(LIBFT_DIR) && make CC="emcc" CFLAGS="$(CFLAGS)"
+	@mv $(LIBFT) $(LIBFT_WEB)
+
+web: libft_web
+	@echo "Building MLX42 for WebAssembly"
+	@cd $(MLX_DIR) && emcmake cmake -B build_web && emmake make -C build_web -j4
+	
+	@echo "Compiling miniRT WebAssembly"
+	@emcc $(LDFLAGS) -O3 $(HEADERS) -pthread $(SRCS) -o ./web/demo.js \
+	    $(MLX_DIR)/build_web/libmlx42.a \
+	    $(LIBFT_WEB) \
+	    --preload-file ./scenes@/scenes \
+	    -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1 \
+	    -s NO_EXIT_RUNTIME=1 -s EXPORTED_RUNTIME_METHODS='["ccall", "cwrap"]' \
+	    -s ALLOW_MEMORY_GROWTH=1 -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=4
+
+cleanweb:
+	@$(RM) $(OBJS)
+	make -C $(LIBFT_DIR) clean
+	@$(RM) $(MLX_DIR)/build_web
+	@$(RM) $(LIBFT_WEB)
+	@$(RM) ./web/demo.*
+
+redoweb: clean web
+
+.PHONY: web libft_web cleanweb all clean fclean re test cleantest retest run1 redoweb

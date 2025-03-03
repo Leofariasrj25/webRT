@@ -149,6 +149,11 @@ int		init_light(char **attributes, t_light **light);
 
 /* ************************ MLX RELATED TYPES ******************************* */
 
+enum e_loglevel {
+	INFO,
+	WARN,
+	ERROR
+};
 
 typedef struct {
 	int			thread_id;

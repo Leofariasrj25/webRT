@@ -14,9 +14,12 @@
 
 void	count_elements(t_scene *scene, int elements_qty[7]);
 
-void	log_msg(char *msg)
+void	log_msg(char *msg, enum e_loglevel level)
 {
-	ft_putstr_fd("[log]:\t", STDOUT_FILENO);
+	static char *level_label[3] = {"[INFO]", "[WARN]", "[ERROR]"};
+
+	ft_putstr_fd(level_label[level], STDOUT_FILENO);
+	ft_putstr_fd(":\t", STDOUT_FILENO);
 	ft_putendl_fd(msg, STDOUT_FILENO);
 }
 
@@ -37,7 +40,7 @@ void	log_scene(t_scene *scene)
 	int		i;
 
 	count_elements(scene, elements_qty);
-	ft_putstr_fd("[log]:\tsuccessfully loaded scene with:", STDOUT_FILENO);
+	ft_putstr_fd("[INFO]:\tsuccessfully loaded scene with:", STDOUT_FILENO);
 	field_names[0] = "\n\tSphere(s): ";
 	field_names[1] = "\n\tPlane(s): ";
 	field_names[2] = "\n\tCylinder(s): ";
@@ -51,19 +54,25 @@ void	log_scene(t_scene *scene)
 			ft_putnbr_fd(elements_qty[i], STDOUT_FILENO);
 		}
 	}
-	if (scene->a_light != NULL)
+	if (scene->a_light != NULL) 
+	{
 		ft_putstr_fd("\n\tambient light: yes", STDOUT_FILENO);
+	}
 	ft_putstr_fd("\n", STDOUT_FILENO);
 }
 
+// private
 void	count_elements(t_scene *scene, int elements_qty[7])
 {
 	int			i;
 	t_elist		*element;
 
-	i = -1;
-	while (++i < 7)
+	i = 0;
+	while (i < 7)
+	{
 		elements_qty[i] = 0;
+		i++;
+	}
 	i = 0;
 	element = scene->elements;
 	while (element)

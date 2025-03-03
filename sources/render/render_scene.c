@@ -128,52 +128,8 @@ void trigger_render(void *arg) {
     }
 }
 
-void render_frame_once(t_appdata *app_data) {
-    pthread_mutex_lock(&app_data->render_mutex);
-    app_data->start_rendering = true;
-    atomic_store(&app_data->threads_done, 0);
-    pthread_cond_broadcast(&app_data->start_render_cond);
-    pthread_mutex_unlock(&app_data->render_mutex);
-
-    pthread_mutex_lock(&app_data->render_mutex);
-    while (atomic_load(&app_data->threads_done) < NUM_THREADS) {
-        pthread_cond_wait(&app_data->frame_ready_cond, &app_data->render_mutex);
-    }
-    app_data->start_rendering = false;
-
-    // Average with per-pixel counts
-    for (int y = 0; y < SCREEN_HEIGHT; y++) {
-        for (int x = 0; x < SCREEN_WIDTH; x++) {
-            int idx = (y * SCREEN_WIDTH + x);
-            int accum_idx = idx * 4;
-            float scale = app_data->pixel_sample_counts[idx] > 0 ? 
-                          1.0f / app_data->pixel_sample_counts[idx] : 1.0f;
-            uint8_t r = (uint8_t)(app_data->accum_buffer[accum_idx] * scale * 255);
-            uint8_t g = (uint8_t)(app_data->accum_buffer[accum_idx + 1] * scale * 255);
-            uint8_t b = (uint8_t)(app_data->accum_buffer[accum_idx + 2] * scale * 255);
-            uint8_t a = (uint8_t)(app_data->accum_buffer[accum_idx + 3] * scale * 255);
-            uint32_t color = (a << 24) | (r << 16) | (g << 8) | b;
-            mlx_put_pixel(app_data->render_image, x, y, color);
-        }
-    }
-
-    mlx_image_t *temp = app_data->render_image;
-    app_data->render_image = app_data->display_image;
-    app_data->display_image = temp;
-    pthread_mutex_unlock(&app_data->render_mutex);
-
-    mlx_image_to_window(app_data->engine, app_data->display_image, 0, 0);
-}
-
-void display_initial_frame(t_appdata *app_data) {
-    pthread_mutex_lock(&app_data->render_mutex);
-    app_data->sample_count = 0;
-    memset(app_data->accum_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * 4 * sizeof(float));
-    pthread_mutex_unlock(&app_data->render_mutex);
-    render_frame_once(app_data);
-}
-
-void* render_area(void* arg) {
+void* render_area(void* arg) 
+{
     t_threaddata *thread_data = (t_threaddata *)arg;
     t_appdata *app_data = thread_data->app_data;
     Xorshift32 rng = { .state = thread_data->thread_id + 1 }; // Seed with thread ID
@@ -191,7 +147,8 @@ void* render_area(void* arg) {
         int pixels_to_sample = pixels_per_thread / sample_fraction;
         if (pixels_to_sample < 1) pixels_to_sample = 1;
 
-        for (int i = 0; i < pixels_to_sample; i++) {
+        for (int i = 0; i < pixels_to_sample; i++) 
+        {
             int x = xorshift32(&rng) % SCREEN_WIDTH;
             int y = thread_data->start_y + (xorshift32(&rng) % (thread_data->end_y - thread_data->start_y));
             int idx = (y * SCREEN_WIDTH + x);
@@ -201,7 +158,8 @@ void* render_area(void* arg) {
         }
 
         int prev_done = atomic_fetch_add(&app_data->threads_done, 1);
-        if (prev_done + 1 == NUM_THREADS) {
+        if (prev_done + 1 == NUM_THREADS) 
+        {
             pthread_mutex_lock(&app_data->render_mutex);
             printf("render_area: Frame complete, sample_count=%d\n", app_data->sample_count);
             pthread_cond_signal(&app_data->frame_ready_cond);
@@ -209,15 +167,17 @@ void* render_area(void* arg) {
             pthread_mutex_unlock(&app_data->render_mutex);
         }
     }
+
     return NULL;
 }
 
-static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image, Xorshift32 *rng) {
-
+static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image, Xorshift32 *rng) 
+{
     int idx = (y * SCREEN_WIDTH + x);
     int accum_idx = idx * 4;
 
-    if (app_data->pixel_sample_counts[idx] >= 8) { // Simplified to max samples only
+    if (app_data->pixel_sample_counts[idx] >= 8) 
+    {
         return;
     }
 
@@ -261,11 +221,14 @@ static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image, Xor
     float delta_old_g = g - old_avg_g;
     float delta_old_b = b - old_avg_b;
 
-    if (app_data->pixel_sample_counts[idx] > 1) {
+    if (app_data->pixel_sample_counts[idx] > 1) 
+    {
         float variance = (delta_r * delta_old_r + delta_g * delta_old_g + delta_b * delta_old_b) / 3.0f;
         variance /= (app_data->pixel_sample_counts[idx] - 1);
         app_data->variance_buffer[idx] = variance;
-    } else {
+    } 
+    else 
+    {
         app_data->variance_buffer[idx] = 1.0f;
     }
 }
@@ -282,7 +245,8 @@ static t_ray    get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene, Xor
 	t_ray		ray;
 	bool		initialized = false;
 
-	if (!initialized) {
+	if (!initialized) 
+        {
 		a_ratio = (double)image->width / image->height;
 		fov_mult = tan(scene->camera->r_fov * 0.5); // Use r_fov, half angle
 	}
@@ -308,9 +272,11 @@ static t_ray    get_px_ray(int x, int y, mlx_image_t *image, t_scene *scene, Xor
 	return ray;
 }
 
-void denoise_image(t_appdata *app_data) {
+void denoise_image(t_appdata *app_data) 
+{
     float *temp_buffer = malloc(SCREEN_WIDTH * SCREEN_HEIGHT * 4 * sizeof(float));
-    if (!temp_buffer) {
+    if (!temp_buffer) 
+    {
         printf("Denoising failed: Memory allocation error\n");
         return;
     }
@@ -337,8 +303,10 @@ void denoise_image(t_appdata *app_data) {
             float g_base = app_data->accum_buffer[idx + 1] * scale;
             float b_base = app_data->accum_buffer[idx + 2] * scale;
 
-            for (int dy = -kernel_size; dy <= kernel_size; dy++) {
-                for (int dx = -kernel_size; dx <= kernel_size; dx++) {
+            for (int dy = -kernel_size; dy <= kernel_size; dy++) 
+            {
+                for (int dx = -kernel_size; dx <= kernel_size; dx++) 
+                {
                     int nx = x + dx;
                     int ny = y + dy;
                     if (nx < 0 || nx >= SCREEN_WIDTH || ny < 0 || ny >= SCREEN_HEIGHT) continue;
@@ -375,7 +343,8 @@ void denoise_image(t_appdata *app_data) {
         }
     }
 
-    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) 
+    {
         float val = temp_buffer[i];
         val = fmaxf(0.0f, fminf(1.0f, val));
         app_data->render_image->pixels[i] = (uint8_t)(val * 255 * 0.5f);

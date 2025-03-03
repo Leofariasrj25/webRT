@@ -21,7 +21,7 @@ void	destroy_scene(t_scene *scene, int scene_fd);
 void	scene_close(int scene_fd);
 
 /* *********************** LOG FUNCTIONS ***************************** */
-void	log_msg(char *msg);
+void	log_msg(char *msg, enum e_loglevel level);
 void	log_render_time(long time);
 void	log_scene(t_scene *scene);
 long	get_currtime_ms(void);

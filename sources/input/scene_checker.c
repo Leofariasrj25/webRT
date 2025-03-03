@@ -14,7 +14,7 @@
 
 int	scene_check(t_scene *scene)
 {
-	log_msg("performing sanity checks");
+	log_msg("performing sanity checks", INFO);
 	if (scene->camera == NULL)
 	{
 		ft_putstr_fd("ERROR: No camera data found\n", STDERR_FILENO);
