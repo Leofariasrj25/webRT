@@ -130,14 +130,32 @@ typedef struct s_scene
 	t_camera		*camera;
 	t_elist			*elements;
 	struct s_scene	*next;
+	struct s_bvh_node	*root;
 
 }	t_scene;
+
+typedef struct s_aabb {
+    t_point min; // Minimum x, y, z
+    t_point max; // Maximum x, y, z
+} t_aabb;
+
+typedef struct s_bvh_node {
+    t_aabb		bounds;
+    struct s_bvh_node	*left;
+    struct s_bvh_node	*right;
+    union u_object	*object;        // Leaf node object (NULL for internal nodes)
+    enum e_element	object_type;
+} t_bvh_node;
+
+typedef t_aabb (*t_aabb_creator)(void *element);
 
 void		elist_addback(t_elist **lst, t_elist *n);
 void		free_elist(t_elist **head);
 t_elist		*elist_new(enum e_element type, char **content, int *op_code);
+
 t_ray		get_ray(t_point origin, t_point destination);
 t_point		new_point(int x, int y, int z);
+
 int		init_camera(char **attributes, t_camera **camera);
 int		init_ambient_light(char **attributes, t_a_light **amb_light);
 int		init_sphere(char **attributes, union u_object *sphere);
@@ -145,6 +163,14 @@ int		init_cylinder(char **attributes, union u_object *cylinder);
 int		init_plane(char **attributes, union u_object *element);
 int		init_light(char **attributes, t_light **light);
 
+t_aabb		merge_aabb(t_aabb a, t_aabb b);
+t_aabb		create_aabb(union u_object *object, enum e_element type);
+t_aabb		create_aabb_plane(void *object);
+t_aabb		create_aabb_sphere(void *object);
+t_aabb		create_aabb_cylinder(void *object);
+t_aabb		create_aabb_cone(void *object);
+
+t_bvh_node	*build_bvh(t_elist *elements); 
 /* ************************************************************************** */
 
 /* ************************ MLX RELATED TYPES ******************************* */

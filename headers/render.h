@@ -46,6 +46,7 @@ void			display_initial_frame(t_appdata *app_data);
 /* ************************ Intersection Functions ************************** */
 
 t_intersection	get_intersection(t_ray ray, t_elist *e);
+t_intersection	get_intersection_bvh(t_ray ray, t_bvh_node *node);
 t_intersection	sphere_intersection(t_ray ray, union u_object object);
 t_intersection	plane_intersection(t_ray ray, union u_object object);
 t_intersection	cylinder_intersection(t_ray ray, union u_object object);

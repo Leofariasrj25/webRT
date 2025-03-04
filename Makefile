@@ -51,6 +51,8 @@ TYPES = $(addprefix types/, \
     init_ambient_light.c \
     new_point.c \
     get_ray.c \
+    t_aabb.c \
+    bvh_tree.c \
 )
 
 RENDER = $(addprefix render/, \

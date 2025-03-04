@@ -20,6 +20,20 @@ int		get_line_fields(int scene_fd, char **line, char ***line_fields);
 int		get_uniq_elem(enum e_element et, char **lf, t_scene *scene, int ln);
 int		get_primitive(enum e_element et, char **line_f, t_scene *scene, int ln);
 
+#include <stdio.h>
+void print_bvh(t_bvh_node *node, int depth) {
+    if (!node) return;
+    printf("Depth %d: AABB min=(%f,%f,%f), max=(%f,%f,%f)\n", depth,
+           node->bounds.min.x, node->bounds.min.y, node->bounds.min.z,
+           node->bounds.max.x, node->bounds.max.y, node->bounds.max.z);
+    if (node->object) {
+        printf("Leaf with object: %p\n", node->object);
+    } else {
+        print_bvh(node->left, depth + 1);
+        print_bvh(node->right, depth + 1);
+    }
+}
+
 int	scene_load(int scene_fd, t_scene *scene)
 {
 	enum e_element	e_type;
@@ -46,6 +60,7 @@ int	scene_load(int scene_fd, t_scene *scene)
 		free_resources(line, ln_fields);
 	}
 	get_next_line(GNL_FLUSH);
+	scene->root = build_bvh(scene->elements);
 	return (0);
 }
 

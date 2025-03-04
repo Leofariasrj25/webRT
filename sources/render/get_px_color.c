@@ -61,7 +61,7 @@ static int compute_color(t_intersection i, t_scene *s, t_ray l, t_ray v)
     int amb, dif, spec;
     t_intersection obj;
 
-    obj = get_intersection(l, s->elements);
+    obj = get_intersection_bvh(l, s->root);
     if (obj.exists && obj.distance < get_distance(i.location, s->light->origin))
     {
         spec = 0;

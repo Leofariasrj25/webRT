@@ -183,7 +183,7 @@ static void render_px(int x, int y, t_appdata *app_data, mlx_image_t *image, Xor
 
     t_scene *s = app_data->scene_info;
     t_ray ray = get_px_ray(x, y, image, s, rng);
-    t_intersection intersec = get_intersection(ray, s->elements);
+    t_intersection intersec = get_intersection_bvh(ray, app_data->scene_info->root);
     int color = get_px_color(intersec, ray, s);
 
     float r = ((color >> 16) & 0xFF) / 255.0f;
