@@ -182,36 +182,60 @@ enum e_loglevel {
 };
 
 typedef struct {
-	int			thread_id;
-	int			start_y;
-	int			end_y;
+    uint32_t state;
+} t_xorshift32;
+
+typedef struct {
+	float	r;
+	float	g;
+	float	b;
+	int	samples;
+} t_pixel;
+
+typedef struct {
+	int x;
+	int y;
+} t_tile;
+
+typedef struct {
 	struct s_data		*app_data;
+	int			thread_id;
+	t_tile			*tiles;
+	t_pixel			*local_buffer;
+	int			start_tile;
+	int			end_tile;
+	int			total_pixels;
 } t_threaddata;
 
 typedef struct s_data
 {
 	mlx_t			*engine;
-	mlx_image_t*		render_image;   // Image being rendered to
-	mlx_image_t*		display_image;  // Image being displayed
+	uint32_t		window_height;
+	uint32_t		window_width;
 	t_scene			*scene_info;
 	int			scene_fd;
 	bool			*keys;
 
-	// multi-thread rendering
-	t_threaddata		thread_data[4];
-	pthread_t		threads[4]; // TODO change to a macro.
+	// render
+	mlx_image_t		*render_image;   // Image being rendered to
+	mlx_image_t		*display_image;  // Image being displayed
+	double			refresh_interval;
+	float			**sobol_sequence;
+	int			frame_offset;
+	t_pixel			*accum_buffer;
+	int			sample_count;
+
+	// multi-thread 
+	t_threaddata		*thread_data;
+	pthread_t		*threads;
 	pthread_mutex_t		render_mutex;
+	pthread_mutex_t		accum_mutex;
 	pthread_cond_t		start_render_cond;
 	pthread_cond_t		frame_ready_cond;
 	bool			start_rendering;
 	bool			rendering_in_progress;
 	bool			image_displayed;
 	atomic_int		threads_done;
-	double			refresh_interval;
-	float			*accum_buffer;
-	float			*variance_buffer;
-	int			*pixel_sample_counts;
-	int			sample_count;
 } t_appdata;
 /* ************************************************************************** */
 

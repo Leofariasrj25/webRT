@@ -15,6 +15,18 @@
 
 # include "types.h"
 
+inline uint32_t xorshift32(t_xorshift32 *rng) 
+{
+    uint32_t x = rng->state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rng->state = x;
+    return x;
+}
+
+void			shutdown(void *arg);
+
 /* *********************** FREE FUNCTIONS ***************************** */
 
 void	destroy_scene(t_scene *scene, int scene_fd);

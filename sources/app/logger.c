@@ -27,10 +27,10 @@ void	log_render_time(long time)
 {
 	long	seconds;
 
-	seconds = time / 1000;
+	seconds = time;
 	ft_putstr_fd("[log]:\tRENDER READY - time elapsed: ", STDOUT_FILENO);
 	ft_putnbr_fd(seconds, STDOUT_FILENO);
-	ft_putstr_fd(" seconds!\n", STDOUT_FILENO);
+	ft_putstr_fd(" miliseconds!\n", STDOUT_FILENO);
 }
 
 void	log_scene(t_scene *scene)

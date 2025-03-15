@@ -32,12 +32,20 @@
 
 #define NUM_THREADS 4
 
+#define PIXEL_SIZE 4
+
+#define SOBOL_BITS 32
+#define SOBOL_SIZE 256
+
+// TILE
+#define TILE_SIZE 16
+#define TOTAL_TILES (SCREEN_WIDTH * SCREEN_HEIGHT) / TILE_SIZE
+#define RAYS_PER_TILE 42
+
 /* **************************** Render Functions **************************** */
 
-void			render_scene(void *arg);
-void			render_loop(void *arg);
 void			*render_area(void *arg);
-void			trigger_render(void *arg);
+void			render_frame(void *arg);
 void			display_loop(void *arg);
 void			display_initial_frame(t_appdata *app_data);
 

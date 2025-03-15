@@ -21,17 +21,76 @@ int		get_uniq_elem(enum e_element et, char **lf, t_scene *scene, int ln);
 int		get_primitive(enum e_element et, char **line_f, t_scene *scene, int ln);
 
 #include <stdio.h>
-void print_bvh(t_bvh_node *node, int depth) {
-    if (!node) return;
-    printf("Depth %d: AABB min=(%f,%f,%f), max=(%f,%f,%f)\n", depth,
-           node->bounds.min.x, node->bounds.min.y, node->bounds.min.z,
-           node->bounds.max.x, node->bounds.max.y, node->bounds.max.z);
-    if (node->object) {
-        printf("Leaf with object: %p\n", node->object);
-    } else {
-        print_bvh(node->left, depth + 1);
-        print_bvh(node->right, depth + 1);
+void print_bvh_tree(t_bvh_node *node, int depth) {
+    if (node == NULL) {
+        return;
     }
+
+    // Print indentation based on depth
+    for (int i = 0; i < depth; i++) {
+        printf("  ");
+    }
+
+    // Print node information
+    printf("Node at depth %d:\n", depth);
+    
+    // Print bounds
+    for (int i = 0; i < depth + 1; i++) {
+        printf("  ");
+    }
+    printf("Bounds:\n");
+    for (int i = 0; i < depth + 2; i++) {
+        printf("  ");
+    }
+    printf("Min: (%.2f, %.2f, %.2f)\n", 
+           node->bounds.min.x, 
+           node->bounds.min.y, 
+           node->bounds.min.z);
+    for (int i = 0; i < depth + 2; i++) {
+        printf("  ");
+    }
+    printf("Max: (%.2f, %.2f, %.2f)\n", 
+           node->bounds.max.x, 
+           node->bounds.max.y, 
+           node->bounds.max.z);
+
+    // Print object type if it's a leaf node
+    if (node->left == NULL && node->right == NULL) {
+        for (int i = 0; i < depth + 1; i++) {
+            printf("  ");
+        }
+        printf("Leaf Node - Object Type: ");
+        
+        switch (node->object_type) {
+            case sphere:
+                printf("Sphere\n");
+                break;
+            case plane:
+                printf("Plane\n");
+                break;
+            case cylinder:
+                printf("Cylinder\n");
+                break;
+            case cone:
+                printf("Cone\n");
+                break;
+            case nae:
+                printf("None\n");
+                break;
+            default:
+                printf("Unknown\n");
+                break;
+        }
+    } else {
+        for (int i = 0; i < depth + 1; i++) {
+            printf("  ");
+        }
+        printf("Internal Node\n");
+    }
+
+    // Recursively print left and right children
+    print_bvh_tree(node->left, depth + 1);
+    print_bvh_tree(node->right, depth + 1);
 }
 
 int	scene_load(int scene_fd, t_scene *scene)
@@ -61,6 +120,7 @@ int	scene_load(int scene_fd, t_scene *scene)
 	}
 	get_next_line(GNL_FLUSH);
 	scene->root = build_bvh(scene->elements);
+	//print_bvh_tree(scene->root, 0);
 	return (0);
 }
 

@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/09 15:26:53 by lfarias-          #+#    #+#             */
-/*   Updated: 2023/04/04 17:47:54 by gcorreia         ###   ########.fr       */
+/*   Updated: 2025/03/05 22:30:10 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,9 @@
 # include "operations.h"
 # include <stdlib.h>
 # include <math.h>
+
+extern long start_time;
+extern long end_time;
 
 // SCREEN 
 #define RES_720_WIDTH 1280
