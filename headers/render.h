@@ -40,7 +40,7 @@
 // TILE
 #define TILE_SIZE 16
 #define TOTAL_TILES (SCREEN_WIDTH * SCREEN_HEIGHT) / TILE_SIZE
-#define RAYS_PER_TILE 42
+#define RAYS_PER_TILE 128
 
 /* **************************** Render Functions **************************** */
 

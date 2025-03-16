@@ -14,6 +14,7 @@
 
 #include <time.h>
 #include <stdio.h>
+#include <sched.h>
 
 #ifdef __EMSCRIPTEN__
 # include <emscripten/html5.h>
