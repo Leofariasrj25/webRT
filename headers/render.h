@@ -6,7 +6,7 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/03/10 17:55:27 by gcorreia          #+#    #+#             */
-/*   Updated: 2023/04/10 12:26:38 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/17 15:07:12 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,8 +37,10 @@
 #define SOBOL_BITS 32
 #define SOBOL_SIZE 256
 
+#define MAX_SAMPLES 256
+
 // TILE
-#define TILE_SIZE 16
+#define TILE_SIZE 16 
 #define TOTAL_TILES (SCREEN_WIDTH * SCREEN_HEIGHT) / TILE_SIZE
 #define RAYS_PER_TILE 128
 
@@ -46,9 +48,9 @@
 
 void			*render_area(void *arg);
 void			render_frame(void *arg);
+int			render_px(float x, float y, t_scene *s, mlx_image_t *image);
 void			display_loop(void *arg);
-void			display_initial_frame(t_appdata *app_data);
-
+void			generate_samples(t_threaddata *thread_data, t_xorshift32 *rng);
 /* ************************************************************************** */
 
 /* ************************ Intersection Functions ************************** */

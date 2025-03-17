@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/12 20:56:33 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/12 20:12:18 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/17 15:22:07 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -67,7 +67,7 @@ int	main(int argc, char **argv)
 
 static int	init_render_loop(t_appdata *app_data) {
     static bool     keyset[MLX_KEYSET_SIZE] = {0};
-    const int	    tile_size = 16;
+    const int	    tile_size = TILE_SIZE;
     const int	    total_tiles_x = SCREEN_WIDTH / tile_size;
     const int	    total_tiles_y = SCREEN_HEIGHT / tile_size;
     const int	    total_tiles = total_tiles_x * total_tiles_y;

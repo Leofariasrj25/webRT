@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/09 15:26:53 by lfarias-          #+#    #+#             */
-/*   Updated: 2023/04/10 20:18:29 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/17 15:47:20 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,6 +36,13 @@ typedef struct s_point
 	double	y;
 	double	z;
 }	t_point;
+
+typedef struct
+{
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+} t_color;
 
 typedef struct s_ray
 {
@@ -190,11 +197,12 @@ typedef struct {
 	float	g;
 	float	b;
 	int	samples;
+	char	padding[16]; // align
 } t_pixel;
 
 typedef struct {
-	int x;
-	int y;
+	int	x;
+	int	y;
 } t_tile;
 
 typedef struct {
