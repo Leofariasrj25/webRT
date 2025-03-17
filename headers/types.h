@@ -215,6 +215,8 @@ typedef struct s_data
 	t_scene			*scene_info;
 	int			scene_fd;
 	bool			*keys;
+	bool			is_moving;
+	bool			stopped_moving;
 
 	// render
 	mlx_image_t		*render_image;   // Image being rendered to
@@ -223,7 +225,9 @@ typedef struct s_data
 	float			**sobol_sequence;
 	int			frame_offset;
 	t_pixel			*accum_buffer;
+	t_pixel			*prev_accum_buffer;
 	int			sample_count;
+	float			blend_alpha;	// used for temporal blending
 
 	// multi-thread 
 	t_threaddata		*thread_data;

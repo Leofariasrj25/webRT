@@ -12,8 +12,9 @@
 
 #include "../../headers/mini_rt.h"
 #include <string.h>
+#include <stdio.h>
 
-static bool handle_wasd(mlx_key_data_t keydata, t_camera *camera);
+static bool handle_wasd(mlx_key_data_t keydata, t_camera *camera, bool *moved);
 
 void	shutdown(void *arg)
 {
@@ -27,12 +28,84 @@ void	shutdown(void *arg)
 
 void key_hook(mlx_key_data_t keydata, void* param) 
 {
+    static struct timespec last_render = {0};
+    struct timespec now;
+    double elapsed;
+    t_appdata *app_data;
+    t_camera *camera;
+    static bool was_moving = false;
+
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    elapsed = (now.tv_sec - last_render.tv_sec) + 
+              (now.tv_nsec - last_render.tv_nsec) / 1e9;
+
+    if (elapsed < 0.1) return;
+
+    app_data = (t_appdata*)param;
+    camera = app_data->scene_info->camera;
+
+    if (keydata.action == MLX_PRESS || keydata.action == MLX_REPEAT) 
+    {
+        if (keydata.key == MLX_KEY_ESCAPE)
+        {
+            shutdown(app_data);
+            return;
+        }
+
+        app_data->keys[keydata.key] = true;
+        app_data->is_moving = handle_wasd(keydata, camera, &app_data->is_moving);
+    }
+    if (keydata.action == MLX_RELEASE) 
+    {
+        app_data->keys[keydata.key] = false;
+        // Check if all movement keys are released
+        bool still_moving = app_data->keys[MLX_KEY_W] || app_data->keys[MLX_KEY_A] ||
+                           app_data->keys[MLX_KEY_S] || app_data->keys[MLX_KEY_D];
+        app_data->is_moving = still_moving;
+    }
+
+    pthread_mutex_lock(&app_data->render_mutex);
+
+    if (app_data->is_moving && !was_moving) 
+    {
+        printf("Motion started\n");
+        app_data->sample_count = 0;
+        app_data->image_displayed = false;
+        app_data->rendering_in_progress = true;
+        app_data->frame_offset = 0;
+        //memset(app_data->accum_buffer, 1, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(t_pixel));
+        pthread_mutex_unlock(&app_data->render_mutex);
+        render_frame(app_data);
+        last_render = now;
+    }
+    else if (!app_data->is_moving && was_moving) // Reset on motion stop
+    {
+        printf("Motion stopped\n");
+        app_data->sample_count = 0;
+        app_data->image_displayed = false;
+        app_data->rendering_in_progress = true;
+        app_data->frame_offset = 0;
+        //memset(app_data->accum_buffer, 0, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(t_pixel));
+        pthread_mutex_unlock(&app_data->render_mutex);
+        render_frame(app_data);
+        last_render = now;
+    }
+    else
+    {
+        pthread_mutex_unlock(&app_data->render_mutex);
+    }
+
+    was_moving = app_data->is_moving; // Update after handling
+}
+
+/*void key_hook(mlx_key_data_t keydata, void* param) 
+{
     static struct timespec  last_render = {0};
     struct timespec         now;
     double                  elapsed;
     t_appdata               *app_data;
     t_camera                *camera;
-    bool                    moved;
+    static bool             was_moving = false;
 
     clock_gettime(CLOCK_MONOTONIC, &now);
     elapsed = (now.tv_sec - last_render.tv_sec) + 
@@ -46,7 +119,6 @@ void key_hook(mlx_key_data_t keydata, void* param)
 
     app_data = (t_appdata*)param;
     camera = app_data->scene_info->camera;
-    moved = false;
 
     if (keydata.action == MLX_PRESS || keydata.action == MLX_REPEAT) 
     {
@@ -57,7 +129,7 @@ void key_hook(mlx_key_data_t keydata, void* param)
         }
 
         app_data->keys[keydata.key] = true;
-        moved = handle_wasd(keydata, camera);
+        app_data->is_moving = handle_wasd(keydata, camera, &app_data->is_moving);
         
     }
     if (keydata.action == MLX_RELEASE) 
@@ -66,8 +138,11 @@ void key_hook(mlx_key_data_t keydata, void* param)
     }
 
     pthread_mutex_lock(&app_data->render_mutex);
-    if (moved) 
+
+    if (app_data->is_moving && !was_moving) 
     {
+        was_moving = app_data->is_moving;
+        app_data->is_moving = false;
         app_data->sample_count = 0;
         app_data->image_displayed = false;
         app_data->rendering_in_progress = true; // Keep true for progressive rendering
@@ -79,36 +154,34 @@ void key_hook(mlx_key_data_t keydata, void* param)
     } else {
         pthread_mutex_unlock(&app_data->render_mutex);
     }
-}
+}*/
 
-static bool handle_wasd(mlx_key_data_t keydata, t_camera *camera)
+static bool handle_wasd(mlx_key_data_t keydata, t_camera *camera, bool *moved)
 {
-    bool    moved;
     float   move_speed;
 
-    moved = false;
     move_speed = 1.0f;
 
     if (keydata.key == MLX_KEY_W) 
     {
         camera->origin.z -= move_speed; 
-        moved = true; 
+        *moved = true; 
     }
     else if (keydata.key == MLX_KEY_S) 
     {
         camera->origin.z += move_speed; 
-        moved = true; 
+        *moved = true; 
     }
     else if (keydata.key == MLX_KEY_A) 
     {
         camera->origin.x -= move_speed; 
-        moved = true; 
+        *moved = true; 
     }
     else if (keydata.key == MLX_KEY_D) 
     {
         camera->origin.x += move_speed; 
-        moved = true; 
+        *moved = true; 
     }
 
-    return moved;
+    return *moved;
 }

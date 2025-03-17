@@ -23,8 +23,9 @@ static t_ray        get_px_ray(float x, float y, mlx_image_t *image, t_scene *sc
 static void         progressive_render(t_threaddata *thread_data);
 static inline void  accumulate_sample_local(t_pixel *buffer, int index, uint32_t color);
 static void         merge_local_to_global(t_appdata *app_data, t_threaddata *thread_data);
-static int  compute_rays_per_tile(float variance);
-static float    compute_tile_variance(t_pixel *local_buffer, int offset, int tile_size);
+static int          compute_rays_per_tile(float variance);
+static float        compute_tile_variance(t_pixel *local_buffer, int offset, int tile_size);
+static void         blend_frames(t_appdata *app_data, t_threaddata *thread_data);
 
 // public
 void render_frame(void *arg) {
@@ -32,11 +33,14 @@ void render_frame(void *arg) {
     bool        needs_more_samples;
 
     app_data = (t_appdata *)arg;
-    needs_more_samples = (app_data->sample_count < 64);
+    needs_more_samples = app_data->sample_count < 256;
 
-    if (!needs_more_samples && !app_data->rendering_in_progress) {
+    if (!needs_more_samples && !app_data->rendering_in_progress) 
+    {
         return;
     }
+
+    app_data->blend_alpha = app_data->is_moving ? 0.1f : 0.5f;
 
     pthread_mutex_lock(&app_data->render_mutex);
 
@@ -46,8 +50,15 @@ void render_frame(void *arg) {
         pthread_cond_broadcast(&app_data->start_render_cond);
     }
 
-    while (atomic_load(&app_data->threads_done) < NUM_THREADS) {
+    while (atomic_load(&app_data->threads_done) < NUM_THREADS) 
+    {
         pthread_cond_wait(&app_data->frame_ready_cond, &app_data->render_mutex);
+    }
+
+    if (app_data->sample_count == 0)
+    {
+        memset(app_data->accum_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(t_pixel));
+        //memset(app_data->prev_accum_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(t_pixel));
     }
 
     pthread_mutex_unlock(&app_data->render_mutex);
@@ -59,8 +70,9 @@ void render_frame(void *arg) {
     mlx_image_t *temp = app_data->render_image;
     app_data->render_image = app_data->display_image;
     app_data->display_image = temp;
-
     mlx_image_to_window(app_data->engine, app_data->display_image, 0, 0);
+
+    memcpy(app_data->prev_accum_buffer, app_data->accum_buffer, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(t_pixel));
 
     if (needs_more_samples) {
         app_data->rendering_in_progress = true;
@@ -98,13 +110,14 @@ void *render_area(void* arg)
         }
 
         generate_samples(thread_data, &rng);
+        blend_frames(app_data, thread_data);
         progressive_render(thread_data);
-        
+
         prev_done = atomic_fetch_add(&app_data->threads_done, 1);
         if (prev_done + 1 == NUM_THREADS) 
         {
             pthread_mutex_lock(&app_data->render_mutex);
-            printf("render_area: Frame complete, sample_count=%d\n", app_data->sample_count);
+            //printf("render_area: Frame complete, sample_count=%d\n", app_data->sample_count);
             pthread_cond_signal(&app_data->frame_ready_cond);
             app_data->start_rendering = false;
             pthread_mutex_unlock(&app_data->render_mutex);
@@ -116,7 +129,7 @@ void *render_area(void* arg)
 
 // private 
 
-static void progressive_render(t_threaddata *thread_data)
+/*static void progressive_render(t_threaddata *thread_data)
 {
     t_appdata   *app_data;
     t_tile      tile;
@@ -147,6 +160,63 @@ static void progressive_render(t_threaddata *thread_data)
                     uint8_t r = pixel->samples > 0 ? (uint8_t)(pixel->r * inv_samples * 255) : 0;
                     uint8_t g = pixel->samples > 0 ? (uint8_t)(pixel->g * inv_samples * 255) : 0;
                     uint8_t b = pixel->samples > 0 ? (uint8_t)(pixel->b * inv_samples * 255) : 0;
+                    
+                    uint32_t color = (255 << 24) | (r << 16) | (g << 8) | b;
+
+                    mlx_put_pixel(app_data->render_image, global.x, global.y, color);
+                }
+            }
+        }
+    }
+}*/
+
+static void progressive_render(t_threaddata *thread_data)
+{
+    t_appdata   *app_data;
+    t_tile      tile;
+    t_pixel     *pixel;
+    t_point     global;
+    int         global_idx;
+    float       inv_samples;
+     
+    app_data = thread_data->app_data; 
+
+    for (int tile_idx = thread_data->start_tile; tile_idx < thread_data->end_tile; tile_idx++) 
+    {
+        tile = thread_data->tiles[tile_idx];
+
+        for (int ly = 0; ly < TILE_SIZE; ly++) 
+        {
+            for (int lx = 0; lx < TILE_SIZE; lx++) 
+            {
+                global.x = tile.x + lx;
+                global.y = tile.y + ly;
+
+                if (global.x < SCREEN_WIDTH && global.y < SCREEN_HEIGHT)
+                {
+                    global_idx = global.y * SCREEN_WIDTH + global.x;
+                    pixel = &app_data->accum_buffer[global_idx];
+
+                    inv_samples = 1.0f / pixel->samples;
+
+                    // Normalize colors by sample count and clamp to [0, 1] to prevent overflow
+                    float r_normalized = pixel->samples > 0 ? pixel->r * inv_samples : 0.0f;
+                    float g_normalized = pixel->samples > 0 ? pixel->g * inv_samples : 0.0f;
+                    float b_normalized = pixel->samples > 0 ? pixel->b * inv_samples : 0.0f;
+
+                    // Clamp normalized values to ensure they stay in [0, 1]
+                    if (r_normalized > 1.0f) r_normalized = 1.0f;
+                    if (r_normalized < 0.0f) r_normalized = 0.0f;
+                    if (g_normalized > 1.0f) g_normalized = 1.0f;
+                    if (g_normalized < 0.0f) g_normalized = 0.0f;
+                    if (b_normalized > 1.0f) b_normalized = 1.0f;
+                    if (b_normalized < 0.0f) b_normalized = 0.0f;
+
+                    // Scale to uint8_t for display
+                    uint8_t r = (uint8_t)(r_normalized * 255);
+                    uint8_t g = (uint8_t)(g_normalized * 255);
+                    uint8_t b = (uint8_t)(b_normalized * 255);
+                    
                     uint32_t color = (255 << 24) | (r << 16) | (g << 8) | b;
 
                     mlx_put_pixel(app_data->render_image, global.x, global.y, color);
@@ -156,6 +226,117 @@ static void progressive_render(t_threaddata *thread_data)
     }
 }
 
+/*static void blend_frames(t_appdata *app_data, t_threaddata *thread_data)
+{
+    t_tile *tiles = thread_data->tiles;
+    int start_tile = thread_data->start_tile;
+    int end_tile = thread_data->end_tile;
+    int tile_size = TILE_SIZE;
+
+    if (app_data->is_moving) printf("Motion detected, alpha=%f\n", app_data->blend_alpha);
+
+    for (int tile_idx = start_tile; tile_idx < end_tile; tile_idx++)
+    {
+        t_tile tile = tiles[tile_idx];
+        for (int y = 0; y < tile_size; y++)
+        {
+            for (int x = 0; x < tile_size; x++)
+            {
+                int global_x = tile.x + x;
+                int global_y = tile.y + y;
+                if (global_x >= 0 && global_x < SCREEN_WIDTH && global_y >= 0 && global_y < SCREEN_HEIGHT)
+                {
+                    int global_idx = global_y * SCREEN_WIDTH + global_x;
+                    t_pixel *curr = &app_data->accum_buffer[global_idx];
+                    t_pixel *prev = &app_data->prev_accum_buffer[global_idx];
+
+                    // Blend only if not first frame or moving
+                    if (app_data->sample_count > 0) {
+                        float alpha = app_data->blend_alpha;
+                        if (app_data->is_moving) {
+                            curr->r = curr->r * (1.0f - alpha) + prev->r * alpha;
+                            curr->g = curr->g * (1.0f - alpha) + prev->g * alpha;
+                            curr->b = curr->b * (1.0f - alpha) + prev->b * alpha;
+                        }
+                        curr->samples += thread_data->local_buffer[...].samples;  // Add new samples
+                        prev->r = curr->r;
+                        prev->g = curr->g;
+                        prev->b = curr->b;
+                        prev->samples = curr->samples;
+                    }
+            }
+        }
+    }
+}*/
+
+static void blend_frames(t_appdata *app_data, t_threaddata *thread_data)
+{
+    t_tile *tiles = thread_data->tiles;
+    int start_tile = thread_data->start_tile;
+    int end_tile = thread_data->end_tile;
+    int tile_size = TILE_SIZE;
+
+    if (app_data->is_moving) printf("Motion detected, alpha=%f\n", app_data->blend_alpha);
+
+    for (int tile_idx = start_tile; tile_idx < end_tile; tile_idx++)
+    {
+        t_tile tile = tiles[tile_idx];
+        int local_tile_offset = (tile_idx - start_tile) * tile_size * tile_size;
+        for (int y = 0; y < tile_size; y++)
+        {
+            for (int x = 0; x < tile_size; x++)
+            {
+                int global_x = tile.x + x;
+                int global_y = tile.y + y;
+                if (global_x >= 0 && global_x < SCREEN_WIDTH && global_y >= 0 && global_y < SCREEN_HEIGHT)
+                {
+                    int global_idx = global_y * SCREEN_WIDTH + global_x;
+                    int local_idx = local_tile_offset + y * tile_size + x;
+                    t_pixel *curr = &app_data->accum_buffer[global_idx];
+                    t_pixel *prev = &app_data->prev_accum_buffer[global_idx];
+                    t_pixel *local = &thread_data->local_buffer[local_idx];
+
+                    if (app_data->is_moving)
+                    {
+                        // Blend with previous frame to reduce ghosting
+                        float alpha = app_data->blend_alpha;
+                        curr->r = local->r * (1.0f - alpha) + prev->r * alpha;
+                        curr->g = local->g * (1.0f - alpha) + prev->g * alpha;
+                        curr->b = local->b * (1.0f - alpha) + prev->b * alpha;
+                        curr->samples = local->samples; // Reset sample count during motion
+                        app_data->is_moving = false;
+                    }
+                    else
+                    {
+                        // Accumulate new samples when stationary
+                        if (app_data->sample_count == 0)
+                        {
+                            // First frame: initialize with local buffer
+                            curr->r = local->r;
+                            curr->g = local->g;
+                            curr->b = local->b;
+                            curr->samples = local->samples;
+                        }
+                        else
+                        {
+                            // Subsequent frames: add new samples
+                            curr->r += local->r;
+                            curr->g += local->g;
+                            curr->b += local->b;
+                            curr->samples += local->samples;
+                        }
+                    }
+
+                    // Update previous buffer for next frame
+                    prev->r = curr->r;
+                    prev->g = curr->g;
+                    prev->b = curr->b;
+                    prev->samples = curr->samples;
+                }
+            }
+        }
+    }
+}
 
 static void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
 {
@@ -170,15 +351,22 @@ static void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
     int         local_idx;
     int         local_tile_offset;
     int         idx_x, idx_y;
+    float       temporal_factor;
 
     app_data = thread_data->app_data;
+    temporal_factor = app_data->is_moving? 1.0f : 0.2f;
 
     for (int tile_idx = thread_data->start_tile; tile_idx < thread_data->end_tile; tile_idx++) 
     {
         tile = thread_data->tiles[tile_idx];
         local_tile_offset = (tile_idx - thread_data->start_tile) * TILE_SIZE * TILE_SIZE;
         float variance = compute_tile_variance(thread_data->local_buffer, local_tile_offset, TILE_SIZE);
-        int rays = compute_rays_per_tile(variance);
+        int rays = (int)(compute_rays_per_tile(variance) * temporal_factor * 2);
+
+        if (rays * 2 > RAYS_PER_TILE)
+        {
+            rays = RAYS_PER_TILE * 2;
+        }
 
         for (int i = 0; i < rays; i++)
         {
@@ -190,12 +378,12 @@ static void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
             coord.x = tile.x + (sobol.x + jitter.x) * (TILE_SIZE - 1);
             coord.y = tile.y + (sobol.y + jitter.y) * (TILE_SIZE - 1);
 
-            idx_x = (int)(coord.x + 0.5); // Round to nearest integer
-            idx_y = (int)(coord.y + 0.5);
+            idx_x = (int)(coord.x); // Round to nearest integer
+            idx_y = (int)(coord.y);
 
             if (idx_x >= tile.x && idx_x < tile.x + TILE_SIZE && idx_y >= tile.y && idx_y < tile.y + TILE_SIZE)
             {
-                color = render_px((float)idx_x, (float)idx_y, app_data->scene_info, app_data->render_image);
+                color = render_px(coord.x, coord.y, app_data->scene_info, app_data->render_image);
                 local.x = idx_x - tile.x;
                 local.y = idx_y - tile.y;
                 local_idx = local_tile_offset + local.y * TILE_SIZE + local.x;
@@ -215,7 +403,6 @@ static int  render_px(float x, float y, t_scene *s, mlx_image_t *image)
 
 	ray = get_px_ray(x, y, image, s);
 	intersec = get_intersection_bvh(ray, s->root);
-	// intersec = get_intersection(ray, s->elements);
         return (color = get_px_color(intersec, ray, s));
 }
 
@@ -282,7 +469,6 @@ static void merge_local_to_global(t_appdata *app_data, t_threaddata *thread_data
     end_tile = thread_data->end_tile;
     tile_size = TILE_SIZE;
 
-    pthread_mutex_lock(&app_data->accum_mutex);
     for (int tile_idx = start_tile; tile_idx < end_tile; tile_idx++)
     {
         local_tile_offset = (tile_idx - start_tile) * tile_size * tile_size;
@@ -316,7 +502,6 @@ static void merge_local_to_global(t_appdata *app_data, t_threaddata *thread_data
             }
         }
     }
-    pthread_mutex_unlock(&app_data->accum_mutex);
 }
 
 static float    compute_tile_variance(t_pixel *local_buffer, int offset, int tile_size)
@@ -332,13 +517,14 @@ static float    compute_tile_variance(t_pixel *local_buffer, int offset, int til
 
     for (int i = 0; i < total_tiles; i++)
     {
+        if (local_buffer[i + offset].samples == 0) continue; // Skip if no samples
         r = local_buffer[i + offset].r / local_buffer[i + offset].samples;
         g = local_buffer[i + offset].g / local_buffer[i + offset].samples;
         b = local_buffer[i + offset].b / local_buffer[i + offset].samples;
         variance += r * r + g * g + b * b;
     }
 
-    return variance;
+    return variance; /// total_tiles;
 }
 
 static int  compute_rays_per_tile(float variance)

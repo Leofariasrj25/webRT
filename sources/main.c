@@ -28,8 +28,6 @@ static int	init_engine(t_appdata *app_data);
 static int	init_render_loop(t_appdata *app_data);
 float		**generate_sobol_sequence(void);
 
-long start_time = 0;
-
 int	main(int argc, char **argv)
 {
 	t_scene		scene;
@@ -117,7 +115,6 @@ static int	init_render_loop(t_appdata *app_data) {
         pthread_create(&app_data->threads[i], NULL, render_area, &app_data->thread_data[i]);
     }
 
-    start_time = get_currtime_ms();
     mlx_key_hook(app_data->engine, key_hook, app_data);
     mlx_close_hook(app_data->engine, shutdown, app_data);
     mlx_loop_hook(app_data->engine, render_frame, app_data);
@@ -192,6 +189,7 @@ static int	init_engine(t_appdata *app_data)
 	}
 	app_data->refresh_interval = 1.0 / 60.0; // 60 Hz default, adjust as needed
 	app_data->accum_buffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(t_pixel));
+	app_data->prev_accum_buffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(t_pixel));
 	app_data->sample_count = 0;
 	app_data->frame_offset = 0;
 	app_data->image_displayed = true;
