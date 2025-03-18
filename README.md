@@ -1,6 +1,6 @@
 # webRT 
 
-![image](https://user-images.githubusercontent.com/69059969/232882789-5e322231-94a0-480f-8e48-296a695243fe.png)
+![image](./media/showcase.png)
 
 ### Project overview:
 A raytracer in your web browser!
