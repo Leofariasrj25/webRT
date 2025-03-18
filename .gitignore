@@ -3,7 +3,7 @@
 
 # Project
 build
-miniRT
+webRT
 ./libs/mlx42/.git*
 
 ### C ###

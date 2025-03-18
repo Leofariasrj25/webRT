@@ -11,7 +11,7 @@
 # **************************************************************************** #
 
 #-----PROJECT VARIABLES-----#
-NAME    =   miniRT
+NAME    =   webRT
 BUILD   =   UnitTests/build
 CC      =   cc
 RM      =   rm -rf

@@ -1,18 +1,14 @@
-# miniRT
+# webRT 
 
 ![image](https://user-images.githubusercontent.com/69059969/232882789-5e322231-94a0-480f-8e48-296a695243fe.png)
 
-* [Overview](https://github.com/gabrielclcardoso/minibash/edit/master/README.md#project-overview)
-* [Approach](https://github.com/gabrielclcardoso/minibash/edit/master/README.md#project-approach)
-* [Extra features](https://github.com/raytracers/miniRT/edit/103-create-readme/README.md#extra-featurees)
-* [Running the ray tracer](https://github.com/raytracers/miniRT/edit/103-create-readme/README.md#running-the-ray-tracer)
-
 ### Project overview:
-This project consists of coding a simple ray tracer in C. The program will read a .rt file, interpret it's contents and render the scene on the screen.
+A raytracer in your web browser!
 
-The project was developed by [me](https://www.linkedin.com/in/gabrielclcardoso/) and [Leonardo Farias](https://www.linkedin.com/in/leofariasrj25/).
+Originally this was a school project with the aim to build a simple ray tracer in C.
+Years later I decided to revisit this project with an audacious goal: make it run on the web, interactive (at least 30fps), support to reflections, etc
 
-#### Features that will be implemented:
+#### Features:
 * Rendering of basic shapes: Cylinders, spheres, planes and cones;
 * Presence of a single light spot;
 * Optional presence of an ambient light;

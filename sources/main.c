@@ -171,7 +171,7 @@ static int	init_scene(t_appdata *app_data, char* filepath)
 static int	init_engine(t_appdata *app_data)
 {
 	log_msg("starting the graphics engine", INFO);
-	app_data->engine = mlx_init(SCREEN_WIDTH, SCREEN_HEIGHT, "MiniRT", true);
+	app_data->engine = mlx_init(SCREEN_WIDTH, SCREEN_HEIGHT, "WebRT", true);
 
 	if(!app_data->engine) {
 		// error handling logic
