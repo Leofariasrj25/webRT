@@ -34,7 +34,7 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
     float       temporal_factor;
 
     app_data = thread_data->app_data;
-    temporal_factor = app_data->is_moving? 1.0f : 0.2f;
+    temporal_factor = app_data->is_moving? 1.0f : 0.5f;
 
     for (int tile_idx = thread_data->start_tile; tile_idx < thread_data->end_tile; tile_idx++) 
     {
@@ -74,11 +74,15 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
 
             if (idx_x >= tile.x && idx_x < tile.x + TILE_SIZE && idx_y >= tile.y && idx_y < tile.y + TILE_SIZE)
             {
-                color = render_px(coord.x, coord.y, app_data->scene_info, app_data->render_image);
                 local.x = idx_x - tile.x;
                 local.y = idx_y - tile.y;
                 local_idx = local_tile_offset + local.y * TILE_SIZE + local.x;
-                accumulate_sample_local(thread_data->local_buffer, local_idx, color);
+
+                if (!thread_data->local_buffer[local_idx].converged)
+                {
+                    color = render_px(coord.x, coord.y, app_data->scene_info, app_data->render_image);
+                    accumulate_sample_local(thread_data->local_buffer, local_idx, color);
+                }
             }
         }
     }
@@ -107,13 +111,13 @@ static float    compute_tile_variance(t_pixel *local_buffer, int offset, int til
         variance += color.r * color.r + color.g * color.g + color.b * color.b;
     }
 
-    return variance; /// total_tiles;
+    return variance / total_tiles;
 }
 
 static int  compute_rays_per_tile(float variance)
 {
     const float scale_factor = 0.1f;
-    const int   base_rays = RAYS_PER_TILE / 2;
+    const int   base_rays = RAYS_PER_TILE / 4;
     int         additional_rays;
     int         ray_amount;
 
@@ -127,13 +131,41 @@ static int  compute_rays_per_tile(float variance)
    
     return ray_amount;
 }
-
+#include <stdio.h>
 static inline void accumulate_sample_local(t_pixel *buffer, int index, uint32_t color)
 {
-    buffer[index].r += ((color >> 16) & 0xFF) / 255.0f;
-    buffer[index].g += ((color >> 8) & 0xFF) / 255.0f;
-    buffer[index].b += (color & 0xFF) / 255.0f;
-    buffer[index].samples += 1;
+    t_pixel     *pixel;
+    t_pixel     prev;
+    t_pixel     curr;
+    t_pixel     diff;
+    bool        under_threshold;
+    const float threshold = 0.5f;
+
+    pixel = &buffer[index];
+    
+    prev.r = pixel->r / (pixel->samples > 0 ? pixel->samples : 1);
+    prev.g = pixel->g / (pixel->samples > 0 ? pixel->samples : 1);
+    prev.b = pixel->b / (pixel->samples > 0 ? pixel->samples : 1);
+
+    pixel->r += ((color >> 16) & 0xFF) / 255.0f;
+    pixel->g += ((color >> 8) & 0xFF) / 255.0f;
+    pixel->b += (color & 0xFF) / 255.0f;
+    pixel->samples += 1;
+
+    curr.r = pixel->r / pixel->samples; 
+    curr.g = pixel->g / pixel->samples; 
+    curr.b = pixel->b / pixel->samples; 
+
+    diff.r = fabsf(curr.r - prev.r);
+    diff.g = fabsf(curr.g - prev.g);
+    diff.b = fabsf(curr.b - curr.b);
+    under_threshold = diff.r < threshold && diff.g < threshold && diff.b < threshold;
+
+    if (!pixel->converged && pixel->samples > 1 && under_threshold)
+    {
+        //printf(">>> converged pixel at index=%d\n", index);
+        pixel->converged = true;
+    }
 }
 
 static inline void atomic_add_float(float *ptr, float val)
@@ -188,12 +220,17 @@ static void merge_local_to_global(t_appdata *app_data, t_threaddata *thread_data
                     atomic_add_float(&global_pixel->r, local_buffer[local_idx].r);
                     atomic_add_float(&global_pixel->g, local_buffer[local_idx].g);
                     atomic_add_float(&global_pixel->b, local_buffer[local_idx].b);
-
+                    if (local_buffer[local_idx].converged) // Propagate convergence
+                    {
+                        global_pixel->converged = true;
+                        app_data->converged_pixels += 1;
+                    }
                     // Reset local buffer
                     local_buffer[local_idx].r = 0;
                     local_buffer[local_idx].g = 0;
                     local_buffer[local_idx].b = 0;
                     local_buffer[local_idx].samples = 0;
+                    local_buffer[local_idx].converged = false;
                 }
             }
         }

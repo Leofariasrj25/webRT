@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/09 15:26:53 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/17 15:47:20 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/18 21:09:20 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -197,6 +197,7 @@ typedef struct {
 	float	g;
 	float	b;
 	int	samples;
+	bool	converged;
 	char	padding[16]; // align
 } t_pixel;
 
@@ -223,7 +224,7 @@ typedef struct s_data
 	t_scene			*scene_info;
 	int			scene_fd;
 	bool			*keys;
-	bool			is_moving;
+	atomic_bool		is_moving;
 	bool			stopped_moving;
 
 	// render
@@ -236,6 +237,7 @@ typedef struct s_data
 	t_pixel			*prev_accum_buffer;
 	int			sample_count;
 	float			blend_alpha;	// used for temporal blending
+	uint32_t		converged_pixels;
 
 	// multi-thread 
 	t_threaddata		*thread_data;

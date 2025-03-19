@@ -6,12 +6,13 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/03/20 16:15:36 by gcorreia          #+#    #+#             */
-/*   Updated: 2025/03/17 15:08:40 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/18 22:20:33 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../headers/mini_rt.h"
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -27,14 +28,14 @@ void render_frame(void *arg) {
     bool        needs_more_samples;
 
     app_data = (t_appdata *)arg;
-    needs_more_samples = app_data->sample_count < MAX_SAMPLES;
+    needs_more_samples = app_data->converged_pixels < (SCREEN_WIDTH * SCREEN_HEIGHT);
 
     if (!needs_more_samples && !app_data->rendering_in_progress) 
     {
         return;
     }
 
-    app_data->blend_alpha = app_data->is_moving ? 0.6f : 0.5f;
+    app_data->blend_alpha = app_data->is_moving ? 0.1f : 0.5f;
 
     pthread_mutex_lock(&app_data->render_mutex);
 
@@ -59,12 +60,6 @@ void render_frame(void *arg) {
     app_data->sample_count++;
     app_data->frame_offset += RAYS_PER_TILE;
     app_data->start_rendering = false;
-
-    mlx_image_t *temp = app_data->render_image;
-    app_data->render_image = app_data->display_image;
-    app_data->display_image = temp;
-    mlx_image_to_window(app_data->engine, app_data->display_image, 0, 0);
-
     memcpy(app_data->prev_accum_buffer, app_data->accum_buffer, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(t_pixel));
 
     if (needs_more_samples) {
@@ -110,7 +105,7 @@ void *render_area(void* arg)
         if (prev_done + 1 == NUM_THREADS) 
         {
             pthread_mutex_lock(&app_data->render_mutex);
-            //printf("render_area: Frame complete, sample_count=%d\n", app_data->sample_count);
+            printf("render_area: Frame complete, sample_count=%d, converged_pixels=%d\n", app_data->sample_count, app_data->converged_pixels);
             pthread_cond_signal(&app_data->frame_ready_cond);
             app_data->start_rendering = false;
             pthread_mutex_unlock(&app_data->render_mutex);
@@ -184,8 +179,6 @@ static void blend_frames(t_appdata *app_data, t_threaddata *thread_data)
     int end_tile = thread_data->end_tile;
     int tile_size = TILE_SIZE;
 
-    if (app_data->is_moving) printf("Motion detected, alpha=%f\n", app_data->blend_alpha);
-
     for (int tile_idx = start_tile; tile_idx < end_tile; tile_idx++)
     {
         t_tile tile = tiles[tile_idx];
@@ -204,45 +197,55 @@ static void blend_frames(t_appdata *app_data, t_threaddata *thread_data)
                     t_pixel *prev = &app_data->prev_accum_buffer[global_idx];
                     t_pixel *local = &thread_data->local_buffer[local_idx];
 
-                    if (app_data->is_moving)
+                    // Skip processing if pixel is converged
+                    if (!curr->converged)
                     {
-                        // Blend with previous frame to reduce ghosting
-                        float alpha = app_data->blend_alpha;
-                        curr->r = local->r * (1.0f - alpha) + prev->r * alpha;
-                        curr->g = local->g * (1.0f - alpha) + prev->g * alpha;
-                        curr->b = local->b * (1.0f - alpha) + prev->b * alpha;
-                        curr->samples = local->samples; // Reset sample count during motion
-                        app_data->is_moving = false;
-                    }
-                    else
-                    {
-                        // Accumulate new samples when stationary
-                        if (app_data->sample_count == 0)
+                        if (app_data->is_moving)
                         {
-                            // First frame: initialize with local buffer
-                            curr->r = local->r;
-                            curr->g = local->g;
-                            curr->b = local->b;
-                            curr->samples = local->samples;
+                            // Blend with previous frame to reduce ghosting
+                            float alpha = app_data->blend_alpha;
+                            curr->r = local->r * (1.0f - alpha) + prev->r * alpha;
+                            curr->g = local->g * (1.0f - alpha) + prev->g * alpha;
+                            curr->b = local->b * (1.0f - alpha) + prev->b * alpha;
+                            curr->samples = local->samples; 
                         }
                         else
                         {
-                            // Subsequent frames: add new samples
-                            curr->r += local->r;
-                            curr->g += local->g;
-                            curr->b += local->b;
-                            curr->samples += local->samples;
+                            // Accumulate new samples when stationary
+                            if (app_data->sample_count == 0)
+                            {
+                                curr->r = local->r;
+                                curr->g = local->g;
+                                curr->b = local->b;
+                                curr->samples = local->samples;
+                            }
+                            else
+                            {
+                                // Subsequent frames: add new samples
+                                curr->r += local->r;
+                                curr->g += local->g;
+                                curr->b += local->b;
+                                curr->samples += local->samples;
+                            }
                         }
                     }
 
-                    // Update previous buffer for next frame
-                    prev->r = curr->r;
-                    prev->g = curr->g;
-                    prev->b = curr->b;
-                    prev->samples = curr->samples;
+                    // Update previous buffer only for non-converged pixels to preserve converged values
+                    if (!curr->converged)
+                    {
+                        prev->r = curr->r;
+                        prev->g = curr->g;
+                        prev->b = curr->b;
+                        prev->samples = curr->samples;
+                    }
                 }
             }
         }
+    }
+
+    if (atomic_load(&app_data->is_moving)) 
+    {
+        atomic_store(&app_data->is_moving, false);
     }
 }
 
@@ -269,7 +272,7 @@ static t_ray    get_px_ray(float x, float y, mlx_image_t *image, t_scene *scene)
 	if (!initialized) 
         {
 		a_ratio = (double)image->width / image->height;
-		fov_mult = tan(scene->camera->r_fov * 0.5); // Use r_fov, half angle
+		fov_mult = tan(scene->camera->r_fov * 0.5);
                 initialized = true;
 	}
 	
@@ -277,9 +280,8 @@ static t_ray    get_px_ray(float x, float y, mlx_image_t *image, t_scene *scene)
         origin.y = (1.0 - 2.0 * (y / image->height)) * fov_mult + scene->camera->origin.y;
         origin.z = -1.0 + scene->camera->origin.z;
 
-	// Generate ray from camera origin to target
 	ray = get_ray(scene->camera->origin, origin);
-	ray.origin = scene->camera->origin; // Ensure ray starts at camera position
+	ray.origin = scene->camera->origin;
 
 	return ray;
 }

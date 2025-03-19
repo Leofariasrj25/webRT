@@ -17,6 +17,9 @@
 
 
 // SCREEN 
+//
+#define RES_1024_WIDTH 1024
+#define RES_1024_HEIGHT 600
 #define RES_720_WIDTH 1280
 #define RES_720_HEIGHT 720
 #define RES_1080_WIDTH 1920

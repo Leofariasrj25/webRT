@@ -6,7 +6,7 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/14 11:13:45 by gcorreia          #+#    #+#             */
-/*   Updated: 2023/04/16 11:39:00 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 01:32:11 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,13 +14,14 @@
 #include <string.h>
 #include <stdio.h>
 
-static bool handle_wasd(mlx_key_data_t keydata, t_camera *camera, bool *moved);
+static void handle_wasd(mlx_key_data_t keydata, t_camera *camera, atomic_bool *moved);
 
 void	shutdown(void *arg)
 {
         t_appdata   *app_data;
 
         app_data = (t_appdata *)arg;
+        mlx_close_window(app_data->engine);
 	destroy_scene(app_data->scene_info, app_data->scene_fd);
 	log_msg("Good Bye :-)", INFO);
         mlx_terminate(app_data->engine);
@@ -53,7 +54,7 @@ void key_hook(mlx_key_data_t keydata, void* param)
         }
 
         app_data->keys[keydata.key] = true;
-        app_data->is_moving = handle_wasd(keydata, camera, &app_data->is_moving);
+        handle_wasd(keydata, camera, &app_data->is_moving);
     }
     if (keydata.action == MLX_RELEASE) 
     {
@@ -70,6 +71,7 @@ void key_hook(mlx_key_data_t keydata, void* param)
     {
         printf("Motion started\n");
         app_data->sample_count = 0;
+        app_data->converged_pixels = 0;
         app_data->image_displayed = false;
         app_data->rendering_in_progress = true;
         app_data->frame_offset = 0;
@@ -82,6 +84,7 @@ void key_hook(mlx_key_data_t keydata, void* param)
     {
         printf("Motion stopped\n");
         app_data->sample_count = 0;
+        app_data->converged_pixels = 0;
         app_data->image_displayed = false;
         app_data->rendering_in_progress = true;
         app_data->frame_offset = 0;
@@ -156,32 +159,34 @@ void key_hook(mlx_key_data_t keydata, void* param)
     }
 }*/
 
-static bool handle_wasd(mlx_key_data_t keydata, t_camera *camera, bool *moved)
+static void handle_wasd(mlx_key_data_t keydata, t_camera *camera, atomic_bool *moved)
 {
     float   move_speed;
+    double  has_moved;
 
     move_speed = 1.0f;
+    has_moved = false;
 
     if (keydata.key == MLX_KEY_W) 
     {
         camera->origin.z -= move_speed; 
-        *moved = true; 
+        has_moved = true; 
     }
     else if (keydata.key == MLX_KEY_S) 
     {
         camera->origin.z += move_speed; 
-        *moved = true; 
+        has_moved = true; 
     }
     else if (keydata.key == MLX_KEY_A) 
     {
         camera->origin.x -= move_speed; 
-        *moved = true; 
+        has_moved = true; 
     }
     else if (keydata.key == MLX_KEY_D) 
     {
         camera->origin.x += move_speed; 
-        *moved = true; 
+        has_moved = true; 
     }
 
-    return *moved;
+    atomic_store(moved, has_moved); 
 }

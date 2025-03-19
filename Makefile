@@ -6,7 +6,7 @@
 #    By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2023/02/09 15:25:00 by lfarias-          #+#    #+#              #
-#    Updated: 2025/03/17 15:05:45 by lfarias-         ###   ########.fr        #
+#    Updated: 2025/03/18 22:59:54 by lfarias-         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -15,7 +15,8 @@ NAME    =   webRT
 BUILD   =   UnitTests/build
 CC      =   cc
 RM      =   rm -rf
-CFLAGS  =   -Wall -Wextra -Werror -O3 -g
+CFLAGS  =   -Wall -Wextra -Werror -O3 -g 
+# -fsanitize=address
 HEADERS =   -I ./headers -I $(LIBFT_DIR) -I $(MLX_DIR)/include
 LIBS    =   -L$(LIBFT_DIR) -lft $(MLX_DIR)/build/libmlx42.a -ldl -lglfw -pthread -lm
 

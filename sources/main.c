@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/12 20:56:33 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/17 15:22:07 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/18 23:02:03 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -118,6 +118,7 @@ static int	init_render_loop(t_appdata *app_data) {
     mlx_key_hook(app_data->engine, key_hook, app_data);
     mlx_close_hook(app_data->engine, shutdown, app_data);
     mlx_loop_hook(app_data->engine, render_frame, app_data);
+    mlx_image_to_window(app_data->engine, app_data->render_image, 0, 0);
     #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop_arg(emscripten_main_loop, app_data->engine, 0, true);
     #else
@@ -138,8 +139,8 @@ static int	init_render_loop(t_appdata *app_data) {
     pthread_cond_destroy(&app_data->frame_ready_cond);
     pthread_cond_destroy(&app_data->start_render_cond);
     mlx_delete_image(app_data->engine, app_data->render_image);
-    mlx_delete_image(app_data->engine, app_data->display_image);
     free(app_data->accum_buffer);
+    free(app_data->prev_accum_buffer);
     mlx_terminate(app_data->engine);
 
     return (EXIT_SUCCESS);
@@ -174,24 +175,23 @@ static int	init_engine(t_appdata *app_data)
 	app_data->engine = mlx_init(SCREEN_WIDTH, SCREEN_HEIGHT, "WebRT", true);
 
 	if(!app_data->engine) {
-		// error handling logic
 		puts(mlx_strerror(mlx_errno));
 		return(EXIT_FAILURE);
 	}
 
-	log_msg("initializing frame buffers", INFO);
+	log_msg("initializing frame buffer", INFO);
 	app_data->render_image = mlx_new_image(app_data->engine, SCREEN_WIDTH, SCREEN_HEIGHT);
-	app_data->display_image = mlx_new_image(app_data->engine, SCREEN_WIDTH, SCREEN_HEIGHT);
-	if (!app_data->display_image || !app_data->render_image) {
-		// error handling logic
+	if (!app_data->render_image) {
 		puts(mlx_strerror(mlx_errno));
 		return(EXIT_FAILURE);
 	}
+
 	app_data->refresh_interval = 1.0 / 60.0; // 60 Hz default, adjust as needed
 	app_data->accum_buffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(t_pixel));
 	app_data->prev_accum_buffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(t_pixel));
 	app_data->sample_count = 0;
 	app_data->frame_offset = 0;
+	app_data->converged_pixels = 0;
 	app_data->image_displayed = true;
 	app_data->sobol_sequence = generate_sobol_sequence();
 	log_msg("engine started", INFO);
@@ -202,7 +202,7 @@ float **generate_sobol_sequence(void)
 {
     float   **sobol;
 
-    // Direction numbers for first two dimensions (Joe and Kuo, 32-bit)
+    // Direction numbers for first two dimensions -32 bits.
     const uint32_t V[2][SOBOL_SIZE] = {
         // Dimension 0: Polynomial x + 1
         { 0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x08000000, 0x04000000, 0x02000000, 0x01000000,
