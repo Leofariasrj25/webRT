@@ -35,6 +35,7 @@ t_aabb   create_aabb(union u_object *object, enum e_element type)
 
 t_aabb merge_aabb(t_aabb a, t_aabb b) {
     t_aabb result;
+
     result.min.x = fmin(a.min.x, b.min.x);
     result.min.y = fmin(a.min.y, b.min.y);
     result.min.z = fmin(a.min.z, b.min.z);
@@ -62,7 +63,7 @@ t_aabb create_aabb_sphere(void *object)
         t_sphere    *sphere;
 	double	    radius;
 
-        log_msg("Creating AABB for sphere", WARN);
+        //log_msg("Creating AABB for sphere", WARN);
         sphere = (t_sphere *)object;
 	radius = sphere->diameter / 2.0;
 
@@ -125,5 +126,6 @@ t_aabb create_aabb_cylinder(void *object) {
 
 t_aabb create_aabb_cone(void *object)
 {
+    //log_msg("Creating AABB for cone", WARN);
     return create_aabb_cylinder(object);
 }

@@ -6,7 +6,7 @@
 /*   By: lfarias- <leofariasrj25@gmail.com>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/17 14:17:42 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/17 17:47:55 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 20:10:25 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -88,6 +88,54 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
     }
 
     merge_local_to_global(app_data, thread_data);
+}
+
+float **generate_sobol_sequence(void)
+{
+    float   **sobol;
+
+    // Direction numbers for first two dimensions -32 bits.
+    const uint32_t V[2][SOBOL_SIZE] = {
+        // Dimension 0: Polynomial x + 1
+        { 0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x08000000, 0x04000000, 0x02000000, 0x01000000,
+          0x00800000, 0x00400000, 0x00200000, 0x00100000, 0x00080000, 0x00040000, 0x00020000, 0x00010000,
+          0x00008000, 0x00004000, 0x00002000, 0x00001000, 0x00000800, 0x00000400, 0x00000200, 0x00000100,
+          0x00000080, 0x00000040, 0x00000020, 0x00000010, 0x00000008, 0x00000004, 0x00000002, 0x00000001 },
+        // Dimension 1: Polynomial x^3 + x^2 + 1
+        { 0x80000000, 0xc0000000, 0x60000000, 0x50000000, 0x28000000, 0x14000000, 0x0a000000, 0x05000000,
+          0x02800000, 0x01400000, 0x00a00000, 0x00500000, 0x00280000, 0x00140000, 0x000a0000, 0x00050000,
+          0x00028000, 0x00014000, 0x0000a000, 0x00005000, 0x00002800, 0x00001400, 0x00000a00, 0x00000500,
+          0x00000280, 0x00000140, 0x000000a0, 0x00000050, 0x00000028, 0x00000014, 0x0000000a, 0x00000005 }
+    };
+
+    sobol = malloc(sizeof(float *) * SOBOL_SIZE); 
+
+    if (!sobol)
+    {
+	return NULL;
+    }
+
+    uint32_t x[SOBOL_SIZE] = {0};
+    uint32_t y[SOBOL_SIZE] = {0};
+
+    for (uint32_t i = 0; i < SOBOL_SIZE; i++) {
+	sobol[i] = malloc(sizeof(float) * 2);
+
+	if (i == 0)
+	{
+	    sobol[0][0] = 0.0f;
+	    sobol[0][1] = 0.0f;
+	    continue;
+	}
+
+        int j = __builtin_ctz(i);
+        x[i] = x[i - 1] ^ V[0][j];
+        y[i] = y[i - 1] ^ V[1][j];
+        sobol[i][0] = (float)x[i] * (1.0f / 4294967296.0f);
+        sobol[i][1] = (float)y[i] * (1.0f / 4294967296.0f);
+    }
+
+    return sobol;
 }
 
 // private 

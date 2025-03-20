@@ -6,7 +6,7 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/03/20 16:15:36 by gcorreia          #+#    #+#             */
-/*   Updated: 2025/03/18 22:20:33 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 20:34:34 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,6 @@
 
 static t_ray        get_px_ray(float x, float y, mlx_image_t *image, t_scene *scene);
 static void         progressive_render(t_threaddata *thread_data);
-static void         blend_frames(t_appdata *app_data, t_threaddata *thread_data);
 
 // public
 void render_frame(void *arg) {
@@ -47,6 +46,7 @@ void render_frame(void *arg) {
 
     while (atomic_load(&app_data->threads_done) < NUM_THREADS) 
     {
+        printf(">>> main thread waiting\n");
         pthread_cond_wait(&app_data->frame_ready_cond, &app_data->render_mutex);
     }
 
@@ -60,7 +60,13 @@ void render_frame(void *arg) {
     app_data->sample_count++;
     app_data->frame_offset += RAYS_PER_TILE;
     app_data->start_rendering = false;
+
     memcpy(app_data->prev_accum_buffer, app_data->accum_buffer, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(t_pixel));
+
+    if (atomic_load(&app_data->is_moving)) 
+    {
+        atomic_store(&app_data->is_moving, false);
+    }
 
     if (needs_more_samples) {
         app_data->rendering_in_progress = true;
@@ -83,14 +89,22 @@ void *render_area(void* arg)
     app_data = thread_data->app_data;
     rng.state = 12345 + thread_data->thread_id;
 
-    while (1) {
+    while (atomic_load(&app_data->is_app_running)) 
+    {
         pthread_mutex_lock(&app_data->render_mutex);
 
-        while (!app_data->start_rendering) {
+        while (!app_data->start_rendering)
+        {
+            printf(">>> thread %d waiting\n", thread_data->thread_id);
             pthread_cond_wait(&app_data->start_render_cond, &app_data->render_mutex);
         }
 
         pthread_mutex_unlock(&app_data->render_mutex);
+        
+        if (!atomic_load(&app_data->is_app_running))
+        {
+                return NULL;
+        }
 
         if (app_data->sample_count == 0)
         {
@@ -172,93 +186,15 @@ static void progressive_render(t_threaddata *thread_data)
     }
 }
 
-static void blend_frames(t_appdata *app_data, t_threaddata *thread_data)
-{
-    t_tile *tiles = thread_data->tiles;
-    int start_tile = thread_data->start_tile;
-    int end_tile = thread_data->end_tile;
-    int tile_size = TILE_SIZE;
-
-    for (int tile_idx = start_tile; tile_idx < end_tile; tile_idx++)
-    {
-        t_tile tile = tiles[tile_idx];
-        int local_tile_offset = (tile_idx - start_tile) * tile_size * tile_size;
-        for (int y = 0; y < tile_size; y++)
-        {
-            for (int x = 0; x < tile_size; x++)
-            {
-                int global_x = tile.x + x;
-                int global_y = tile.y + y;
-                if (global_x >= 0 && global_x < SCREEN_WIDTH && global_y >= 0 && global_y < SCREEN_HEIGHT)
-                {
-                    int global_idx = global_y * SCREEN_WIDTH + global_x;
-                    int local_idx = local_tile_offset + y * tile_size + x;
-                    t_pixel *curr = &app_data->accum_buffer[global_idx];
-                    t_pixel *prev = &app_data->prev_accum_buffer[global_idx];
-                    t_pixel *local = &thread_data->local_buffer[local_idx];
-
-                    // Skip processing if pixel is converged
-                    if (!curr->converged)
-                    {
-                        if (app_data->is_moving)
-                        {
-                            // Blend with previous frame to reduce ghosting
-                            float alpha = app_data->blend_alpha;
-                            curr->r = local->r * (1.0f - alpha) + prev->r * alpha;
-                            curr->g = local->g * (1.0f - alpha) + prev->g * alpha;
-                            curr->b = local->b * (1.0f - alpha) + prev->b * alpha;
-                            curr->samples = local->samples; 
-                        }
-                        else
-                        {
-                            // Accumulate new samples when stationary
-                            if (app_data->sample_count == 0)
-                            {
-                                curr->r = local->r;
-                                curr->g = local->g;
-                                curr->b = local->b;
-                                curr->samples = local->samples;
-                            }
-                            else
-                            {
-                                // Subsequent frames: add new samples
-                                curr->r += local->r;
-                                curr->g += local->g;
-                                curr->b += local->b;
-                                curr->samples += local->samples;
-                            }
-                        }
-                    }
-
-                    // Update previous buffer only for non-converged pixels to preserve converged values
-                    if (!curr->converged)
-                    {
-                        prev->r = curr->r;
-                        prev->g = curr->g;
-                        prev->b = curr->b;
-                        prev->samples = curr->samples;
-                    }
-                }
-            }
-        }
-    }
-
-    if (atomic_load(&app_data->is_moving)) 
-    {
-        atomic_store(&app_data->is_moving, false);
-    }
-}
-
 
 int  render_px(float x, float y, t_scene *s, mlx_image_t *image)
 {
 	t_ray			ray;
 	t_intersection	intersec;
-	int				color;
 
 	ray = get_px_ray(x, y, image, s);
 	intersec = get_intersection_bvh(ray, s->root);
-        return (color = get_px_color(intersec, ray, s));
+        return (get_px_color(intersec, ray, s));
 }
 
 static t_ray    get_px_ray(float x, float y, mlx_image_t *image, t_scene *scene)

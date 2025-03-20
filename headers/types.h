@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/09 15:26:53 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/18 21:09:20 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 22:36:14 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -178,6 +178,7 @@ t_aabb		create_aabb_cylinder(void *object);
 t_aabb		create_aabb_cone(void *object);
 
 t_bvh_node	*build_bvh(t_elist *elements); 
+void		free_bvh(t_bvh_node *node);
 /* ************************************************************************** */
 
 /* ************************ MLX RELATED TYPES ******************************* */
@@ -224,13 +225,13 @@ typedef struct s_data
 	t_scene			*scene_info;
 	int			scene_fd;
 	bool			*keys;
+	atomic_bool		is_app_running;
 	atomic_bool		is_moving;
 	bool			stopped_moving;
 
 	// render
 	mlx_image_t		*render_image;   // Image being rendered to
 	mlx_image_t		*display_image;  // Image being displayed
-	double			refresh_interval;
 	float			**sobol_sequence;
 	int			frame_offset;
 	t_pixel			*accum_buffer;

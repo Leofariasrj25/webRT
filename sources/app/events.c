@@ -6,7 +6,7 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/14 11:13:45 by gcorreia          #+#    #+#             */
-/*   Updated: 2025/03/19 01:32:11 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 21:33:41 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,15 +16,13 @@
 
 static void handle_wasd(mlx_key_data_t keydata, t_camera *camera, atomic_bool *moved);
 
-void	shutdown(void *arg)
+void	close_app(void *arg)
 {
         t_appdata   *app_data;
 
         app_data = (t_appdata *)arg;
-        mlx_close_window(app_data->engine);
-	destroy_scene(app_data->scene_info, app_data->scene_fd);
 	log_msg("Good Bye :-)", INFO);
-        mlx_terminate(app_data->engine);
+        mlx_close_window(app_data->engine);
 }
 
 void key_hook(mlx_key_data_t keydata, void* param) 
@@ -49,7 +47,7 @@ void key_hook(mlx_key_data_t keydata, void* param)
     {
         if (keydata.key == MLX_KEY_ESCAPE)
         {
-            shutdown(app_data);
+            close_app(app_data);
             return;
         }
 

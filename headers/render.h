@@ -6,7 +6,7 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/03/10 17:55:27 by gcorreia          #+#    #+#             */
-/*   Updated: 2025/03/17 15:07:12 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 20:08:43 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,7 @@
 
 
 // SCREEN 
-//
+
 #define RES_1024_WIDTH 1024
 #define RES_1024_HEIGHT 600
 #define RES_720_WIDTH 1280
@@ -49,11 +49,13 @@
 
 /* **************************** Render Functions **************************** */
 
-void			*render_area(void *arg);
 void			render_frame(void *arg);
+void			*render_area(void *arg);
 int			render_px(float x, float y, t_scene *s, mlx_image_t *image);
-void			display_loop(void *arg);
 void			generate_samples(t_threaddata *thread_data, t_xorshift32 *rng);
+float			**generate_sobol_sequence(void);
+void			blend_frames(t_appdata *app_data, t_threaddata *thread_data);
+
 /* ************************************************************************** */
 
 /* ************************ Intersection Functions ************************** */

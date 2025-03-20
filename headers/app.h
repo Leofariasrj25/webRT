@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/03/13 14:50:58 by lfarias-          #+#    #+#             */
-/*   Updated: 2023/04/17 11:45:06 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 21:29:41 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,7 @@ inline uint32_t xorshift32(t_xorshift32 *rng)
     return x;
 }
 
-void			shutdown(void *arg);
+void			close_app(void *arg);
 
 /* *********************** FREE FUNCTIONS ***************************** */
 
@@ -39,5 +39,5 @@ void	log_scene(t_scene *scene);
 long	get_currtime_ms(void);
 
 /* ************************ Key ************************************** */
-void key_hook(mlx_key_data_t keydata, void* param);
+void	key_hook(mlx_key_data_t keydata, void* param);
 #endif

@@ -6,7 +6,7 @@
 #    By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2023/02/09 15:25:00 by lfarias-          #+#    #+#              #
-#    Updated: 2025/03/18 22:59:54 by lfarias-         ###   ########.fr        #
+#    Updated: 2025/03/19 23:04:30 by lfarias-         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -15,7 +15,7 @@ NAME    =   webRT
 BUILD   =   UnitTests/build
 CC      =   cc
 RM      =   rm -rf
-CFLAGS  =   -Wall -Wextra -Werror -O3 -g 
+CFLAGS  =   -Wall -Wextra -Werror -O3 -g -fsanitize=thread
 # -fsanitize=address
 HEADERS =   -I ./headers -I $(LIBFT_DIR) -I $(MLX_DIR)/include
 LIBS    =   -L$(LIBFT_DIR) -lft $(MLX_DIR)/build/libmlx42.a -ldl -lglfw -pthread -lm
@@ -64,6 +64,7 @@ RENDER = $(addprefix render/, \
     cone_intersection.c \
     render_scene.c \
     sampler.c	   \
+    temporal_blender.c	   \
     get_px_color.c \
     compute_diffuse.c \
     compute_ambient.c \

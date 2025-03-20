@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/12 20:56:33 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/18 23:02:03 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 22:02:16 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,7 +26,7 @@ void emscripten_main_loop(void* arg);
 static int	init_scene(t_appdata *scene, char *filepath);
 static int	init_engine(t_appdata *app_data);
 static int	init_render_loop(t_appdata *app_data);
-float		**generate_sobol_sequence(void);
+static void	shutdown_app(t_appdata *app_data);
 
 int	main(int argc, char **argv)
 {
@@ -41,7 +41,7 @@ int	main(int argc, char **argv)
 
 	    scene_filepath = argv[1];
 	#else 
-	    scene_filepath = "./scenes/simple_scene3.rt"; //default scene
+	    scene_filepath = "./scenes/showcase.rt"; //default scene
 	#endif
 
 	app_data.scene_info = &scene;
@@ -54,6 +54,7 @@ int	main(int argc, char **argv)
 		return (2);
 	}
 
+	shutdown_app(&app_data);
 	return (0);
 }
 
@@ -116,7 +117,6 @@ static int	init_render_loop(t_appdata *app_data) {
     }
 
     mlx_key_hook(app_data->engine, key_hook, app_data);
-    mlx_close_hook(app_data->engine, shutdown, app_data);
     mlx_loop_hook(app_data->engine, render_frame, app_data);
     mlx_image_to_window(app_data->engine, app_data->render_image, 0, 0);
     #ifdef __EMSCRIPTEN__
@@ -124,24 +124,6 @@ static int	init_render_loop(t_appdata *app_data) {
     #else
 	mlx_loop(app_data->engine);
     #endif
-	
-    // Cleanup
-    pthread_mutex_lock(&app_data->render_mutex);
-    pthread_cond_broadcast(&app_data->frame_ready_cond);
-    pthread_mutex_unlock(&app_data->render_mutex);
-
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(app_data->threads[i], NULL);
-    }
-
-    pthread_mutex_destroy(&app_data->render_mutex);
-    pthread_mutex_destroy(&app_data->accum_mutex);
-    pthread_cond_destroy(&app_data->frame_ready_cond);
-    pthread_cond_destroy(&app_data->start_render_cond);
-    mlx_delete_image(app_data->engine, app_data->render_image);
-    free(app_data->accum_buffer);
-    free(app_data->prev_accum_buffer);
-    mlx_terminate(app_data->engine);
 
     return (EXIT_SUCCESS);
 }
@@ -179,6 +161,7 @@ static int	init_engine(t_appdata *app_data)
 		return(EXIT_FAILURE);
 	}
 
+	atomic_store(&app_data->is_app_running, true);
 	log_msg("initializing frame buffer", INFO);
 	app_data->render_image = mlx_new_image(app_data->engine, SCREEN_WIDTH, SCREEN_HEIGHT);
 	if (!app_data->render_image) {
@@ -186,9 +169,17 @@ static int	init_engine(t_appdata *app_data)
 		return(EXIT_FAILURE);
 	}
 
-	app_data->refresh_interval = 1.0 / 60.0; // 60 Hz default, adjust as needed
 	app_data->accum_buffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(t_pixel));
 	app_data->prev_accum_buffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(t_pixel));
+	for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
+	{
+	    app_data->prev_accum_buffer[i].r = 0.5f; // Gray
+	    app_data->prev_accum_buffer[i].g = 0.5f;
+	    app_data->prev_accum_buffer[i].b = 0.5f;
+	    app_data->prev_accum_buffer[i].samples = 1;
+	    app_data->prev_accum_buffer[i].converged = false;
+	}
+	
 	app_data->sample_count = 0;
 	app_data->frame_offset = 0;
 	app_data->converged_pixels = 0;
@@ -198,50 +189,38 @@ static int	init_engine(t_appdata *app_data)
 	return (0);
 }
 
-float **generate_sobol_sequence(void)
+static void shutdown_app(t_appdata *app_data)
 {
-    float   **sobol;
+    atomic_store(&app_data->is_app_running, false);
 
-    // Direction numbers for first two dimensions -32 bits.
-    const uint32_t V[2][SOBOL_SIZE] = {
-        // Dimension 0: Polynomial x + 1
-        { 0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x08000000, 0x04000000, 0x02000000, 0x01000000,
-          0x00800000, 0x00400000, 0x00200000, 0x00100000, 0x00080000, 0x00040000, 0x00020000, 0x00010000,
-          0x00008000, 0x00004000, 0x00002000, 0x00001000, 0x00000800, 0x00000400, 0x00000200, 0x00000100,
-          0x00000080, 0x00000040, 0x00000020, 0x00000010, 0x00000008, 0x00000004, 0x00000002, 0x00000001 },
-        // Dimension 1: Polynomial x^3 + x^2 + 1
-        { 0x80000000, 0xc0000000, 0x60000000, 0x50000000, 0x28000000, 0x14000000, 0x0a000000, 0x05000000,
-          0x02800000, 0x01400000, 0x00a00000, 0x00500000, 0x00280000, 0x00140000, 0x000a0000, 0x00050000,
-          0x00028000, 0x00014000, 0x0000a000, 0x00005000, 0x00002800, 0x00001400, 0x00000a00, 0x00000500,
-          0x00000280, 0x00000140, 0x000000a0, 0x00000050, 0x00000028, 0x00000014, 0x0000000a, 0x00000005 }
-    };
+    pthread_mutex_lock(&app_data->render_mutex);
+    app_data->start_rendering = true;
+    pthread_cond_broadcast(&app_data->start_render_cond); // wake up waiting threads
+    pthread_mutex_unlock(&app_data->render_mutex);
 
-    sobol = malloc(sizeof(float *) * SOBOL_SIZE); 
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(app_data->threads[i], NULL);
+	free(app_data->thread_data[i].local_buffer);
+    }
 
-    if (!sobol)
+    free(app_data->thread_data[0].tiles);
+    free(app_data->threads);
+    free(app_data->thread_data);
+    pthread_mutex_destroy(&app_data->render_mutex);
+    pthread_mutex_destroy(&app_data->accum_mutex);
+    pthread_cond_destroy(&app_data->frame_ready_cond);
+    pthread_cond_destroy(&app_data->start_render_cond);
+
+    mlx_delete_image(app_data->engine, app_data->render_image);
+    free(app_data->accum_buffer);
+    free(app_data->prev_accum_buffer);
+    
+    for (int j = 0; j < SOBOL_SIZE; j++)
     {
-	return NULL;
+	free(app_data->sobol_sequence[j]);
     }
 
-    uint32_t x[SOBOL_SIZE] = {0};
-    uint32_t y[SOBOL_SIZE] = {0};
-
-    for (uint32_t i = 0; i < SOBOL_SIZE; i++) {
-	sobol[i] = malloc(sizeof(float) * 2);
-
-	if (i == 0)
-	{
-	    sobol[0][0] = 0.0f;
-	    sobol[0][1] = 0.0f;
-	    continue;
-	}
-
-        int j = __builtin_ctz(i);
-        x[i] = x[i - 1] ^ V[0][j];
-        y[i] = y[i - 1] ^ V[1][j];
-        sobol[i][0] = (float)x[i] * (1.0f / 4294967296.0f);
-        sobol[i][1] = (float)y[i] * (1.0f / 4294967296.0f);
-    }
-
-    return sobol;
+    free(app_data->sobol_sequence);
+    destroy_scene(app_data->scene_info, app_data->scene_fd);
+    mlx_terminate(app_data->engine);
 }

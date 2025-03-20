@@ -6,7 +6,7 @@
 /*   By: lfarias- <leofariasrj25@gmail.com>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/05 13:27:57 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/05 13:28:05 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/19 22:46:09 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,6 +25,7 @@ static t_elist      **list_to_array(t_elist *elements, int count);
 
 t_bvh_node *build_bvh(t_elist *elements) {
     int     count;
+    int     valid_count;
     t_aabb  box;
     t_elist **array;
     t_elist **valid_array;
@@ -37,7 +38,7 @@ t_bvh_node *build_bvh(t_elist *elements) {
 
     array = list_to_array(elements, count);
     valid_array = malloc(sizeof(t_elist *) * count);
-    int valid_count = 0;
+    valid_count = 0;
     for (int i = 0; i < count; i++) {
         box = create_aabb(&array[i]->object, array[i]->type);
 
@@ -59,6 +60,31 @@ t_bvh_node *build_bvh(t_elist *elements) {
     return root;
 }
 
+void    free_bvh(t_bvh_node *node)
+{
+    // for each node do
+    // if the node has a child, access it.
+    // if it's a leaf (contains an object), return
+    // free child
+    // return
+    if (!node->left && !node->right && node->object != NULL) // leaf
+    {
+        free(node);
+        return;
+    }
+
+    if (node->left != NULL)
+    {
+        free_bvh(node->left);
+    }
+
+    if (node->right != NULL)
+    {
+        free_bvh(node->right);
+    }
+
+    free(node);
+}
 // private
 
 static int count_list_elements(t_elist *elements) 
