@@ -6,7 +6,7 @@
 /*   By: lfarias- <leofariasrj25@gmail.com>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/17 14:17:42 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/19 20:10:25 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/23 02:38:10 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,7 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
     t_appdata   *app_data;
     t_tile      tile;
     t_point     jitter;
+    uint32_t    hash;
     t_point     sobol;
     t_point     coord;
     t_point     local;
@@ -34,7 +35,7 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
     float       temporal_factor;
 
     app_data = thread_data->app_data;
-    temporal_factor = app_data->is_moving? 1.0f : 0.5f;
+    temporal_factor = atomic_load(&app_data->is_moving) ? 1.0f : 0.5f;
 
     for (int tile_idx = thread_data->start_tile; tile_idx < thread_data->end_tile; tile_idx++) 
     {
@@ -54,20 +55,22 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
             rays = 1;
         }
 
+        int frame_offset = atomic_load(&app_data->frame_offset);
         for (int i = 0; i < rays; i++)
         {
-            sobol_idx = (i + app_data->frame_offset + (tile_idx * 31)) % SOBOL_SIZE;
+            hash = hash_tile(tile_idx, frame_offset);
+            sobol_idx = (i + hash) % SOBOL_SIZE;
             sobol.x = app_data->sobol_sequence[sobol_idx][0];
             sobol.y = app_data->sobol_sequence[sobol_idx][1];
-            jitter.x = (xorshift32(rng) & 0xFFFF) * (1.0f / 65536.0f) * 1.0f - 0.5f; // [-0.5, 0.5]
-            jitter.y = (xorshift32(rng) & 0xFFFF) * (1.0f / 65536.0f) * 1.0f - 0.5f; // [-0.5, 0.5]
+            jitter.x = (xorshift32(rng) & 0xFFFF) * (1.0f / 65536.0f) * 1.6f - 0.8f; // [-0.5, 0.5]
+            jitter.y = (xorshift32(rng) & 0xFFFF) * (1.0f / 65536.0f) * 1.6f - 0.8f; // [-0.5, 0.5]
             coord.x = tile.x + (sobol.x + jitter.x) * (TILE_SIZE - 1);
             coord.y = tile.y + (sobol.y + jitter.y) * (TILE_SIZE - 1);
 
             idx_x = (int)(coord.x); // Round to nearest integer
             idx_y = (int)(coord.y);
 
-            if (app_data->is_moving && (idx_x + idx_y) % 2 != app_data->sample_count % 2)
+            if (atomic_load(&app_data->is_moving) && (idx_x + idx_y) % 2 != atomic_load(&app_data->sample_count) % 2)
             {
                 continue; // Skip this pixel, it will be filled by blending with the previous frame
             }
@@ -92,8 +95,10 @@ void generate_samples(t_threaddata *thread_data, t_xorshift32 *rng)
 
 float **generate_sobol_sequence(void)
 {
-    float   **sobol;
-
+    float           **sobol;
+    t_xorshift32    rng;
+    uint32_t        scramble_x;
+    uint32_t        scramble_y;
     // Direction numbers for first two dimensions -32 bits.
     const uint32_t V[2][SOBOL_SIZE] = {
         // Dimension 0: Polynomial x + 1
@@ -108,6 +113,7 @@ float **generate_sobol_sequence(void)
           0x00000280, 0x00000140, 0x000000a0, 0x00000050, 0x00000028, 0x00000014, 0x0000000a, 0x00000005 }
     };
 
+    rng.state = 12345; // get_currtime_ms();
     sobol = malloc(sizeof(float *) * SOBOL_SIZE); 
 
     if (!sobol)
@@ -131,6 +137,13 @@ float **generate_sobol_sequence(void)
         int j = __builtin_ctz(i);
         x[i] = x[i - 1] ^ V[0][j];
         y[i] = y[i - 1] ^ V[1][j];
+
+        // Owen Scrambling to better distribute the sequence.
+        scramble_x = xorshift32(&rng);
+        scramble_y = xorshift32(&rng);
+        x[i] ^= scramble_x;
+        y[i] ^= scramble_y;
+
         sobol[i][0] = (float)x[i] * (1.0f / 4294967296.0f);
         sobol[i][1] = (float)y[i] * (1.0f / 4294967296.0f);
     }
@@ -139,7 +152,6 @@ float **generate_sobol_sequence(void)
 }
 
 // private 
-
 
 static float    compute_tile_variance(t_pixel *local_buffer, int offset, int tile_size)
 {
@@ -179,7 +191,7 @@ static int  compute_rays_per_tile(float variance)
    
     return ray_amount;
 }
-#include <stdio.h>
+
 static inline void accumulate_sample_local(t_pixel *buffer, int index, uint32_t color)
 {
     t_pixel     *pixel;

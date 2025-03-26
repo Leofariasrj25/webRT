@@ -56,6 +56,15 @@ void			generate_samples(t_threaddata *thread_data, t_xorshift32 *rng);
 float			**generate_sobol_sequence(void);
 void			blend_frames(t_appdata *app_data, t_threaddata *thread_data);
 
+// based on knuth multiplicative hash.
+static inline uint32_t	hash_tile(int tile_idx, int frame_offset) 
+{
+    uint32_t hash = tile_idx * 2654435761U + frame_offset * 1664525U;
+    hash ^= hash >> 16;
+    hash *= 2654435761U;
+    hash ^= hash >> 16;
+    return hash;
+}
 /* ************************************************************************** */
 
 /* ************************ Intersection Functions ************************** */

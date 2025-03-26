@@ -15,7 +15,8 @@ NAME    =   webRT
 BUILD   =   UnitTests/build
 CC      =   cc
 RM      =   rm -rf
-CFLAGS  =   -Wall -Wextra -Werror -O3 -g -fsanitize=thread
+CFLAGS  =   -Wall -Wextra -Werror -O3 -g 
+#-fsanitize=thread
 # -fsanitize=address
 HEADERS =   -I ./headers -I $(LIBFT_DIR) -I $(MLX_DIR)/include
 LIBS    =   -L$(LIBFT_DIR) -lft $(MLX_DIR)/build/libmlx42.a -ldl -lglfw -pthread -lm

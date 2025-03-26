@@ -6,7 +6,7 @@
 /*   By: gcorreia <gcorreia@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/03/20 16:15:36 by gcorreia          #+#    #+#             */
-/*   Updated: 2025/03/19 20:34:34 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/23 02:17:59 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,8 +55,6 @@ void render_frame(void *arg) {
         memset(app_data->accum_buffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(t_pixel));
     }
 
-    pthread_mutex_unlock(&app_data->render_mutex);
-
     app_data->sample_count++;
     app_data->frame_offset += RAYS_PER_TILE;
     app_data->start_rendering = false;
@@ -75,6 +73,7 @@ void render_frame(void *arg) {
         app_data->image_displayed = true;
     }
 
+    pthread_mutex_unlock(&app_data->render_mutex);
 }
 
 
@@ -106,7 +105,7 @@ void *render_area(void* arg)
                 return NULL;
         }
 
-        if (app_data->sample_count == 0)
+        if (atomic_load(&app_data->sample_count) == 0)
         {
             memset(thread_data->local_buffer, 0, thread_data->total_pixels);
         }
@@ -186,11 +185,10 @@ static void progressive_render(t_threaddata *thread_data)
     }
 }
 
-
 int  render_px(float x, float y, t_scene *s, mlx_image_t *image)
 {
 	t_ray			ray;
-	t_intersection	intersec;
+	t_intersection	        intersec;
 
 	ray = get_px_ray(x, y, image, s);
 	intersec = get_intersection_bvh(ray, s->root);
@@ -221,5 +219,3 @@ static t_ray    get_px_ray(float x, float y, mlx_image_t *image, t_scene *scene)
 
 	return ray;
 }
-
-

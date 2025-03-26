@@ -6,7 +6,7 @@
 /*   By: lfarias- <lfarias-@student.42.rio>         +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/09 15:26:53 by lfarias-          #+#    #+#             */
-/*   Updated: 2025/03/19 22:36:14 by lfarias-         ###   ########.fr       */
+/*   Updated: 2025/03/23 02:26:32 by lfarias-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -231,12 +231,11 @@ typedef struct s_data
 
 	// render
 	mlx_image_t		*render_image;   // Image being rendered to
-	mlx_image_t		*display_image;  // Image being displayed
 	float			**sobol_sequence;
-	int			frame_offset;
+	atomic_int		frame_offset;
 	t_pixel			*accum_buffer;
 	t_pixel			*prev_accum_buffer;
-	int			sample_count;
+	atomic_int		sample_count;
 	float			blend_alpha;	// used for temporal blending
 	uint32_t		converged_pixels;
 
@@ -247,9 +246,9 @@ typedef struct s_data
 	pthread_mutex_t		accum_mutex;
 	pthread_cond_t		start_render_cond;
 	pthread_cond_t		frame_ready_cond;
-	bool			start_rendering;
-	bool			rendering_in_progress;
-	bool			image_displayed;
+	atomic_bool		start_rendering;
+	atomic_bool		rendering_in_progress;
+	atomic_bool		image_displayed;
 	atomic_int		threads_done;
 } t_appdata;
 /* ************************************************************************** */
